@@ -41,9 +41,8 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
     var wins = 0
     val held = BooleanArray(9)
 
-    private var aiTimer = 0
-    private var aiPlan = 0
-    private var aiFresh = false
+    val aiLevel = when { diff < 0.4f -> 0; diff > 0.7f -> 2; else -> 1 }
+    private val ai = Ai(aiLevel)
     private val rnd = java.util.Random()
 
     val onGround get() = y >= K.GROUND
@@ -142,44 +141,7 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
     }
 
     fun think(opp: Fighter) {
-        java.util.Arrays.fill(held, false)
-        if (state == S.KO || state == S.WIN) return
-        aiTimer--
-        aiFresh = false
-        val dist = abs(opp.x - x)
-        val dir = if (opp.x > x) 1 else -1
-
-        if (aiTimer <= 0) {
-            aiTimer = (6 + (1f - diff) * 26f).toInt() + rnd.nextInt(8)
-            aiFresh = true
-            val r = rnd.nextFloat()
-            aiPlan = when {
-                dist in 200f..750f && r < 0.25f + diff * 0.25f -> 5 // Special
-                opp.acting && dist < 180f && r < 0.15f + diff * 0.7f -> 4 // Block
-                dist < 80f && r < 0.35f -> 8 // Grab
-                dist > 180f -> if (r < 0.14f) 7 else 1 // Approach
-                else -> when {
-                    r < 0.30f -> 2 // Punch
-                    r < 0.50f -> 3 // Kick
-                    r < 0.65f -> 6 // Crouch Sweep / Uppercut
-                    r < 0.75f -> 8 // Grab
-                    r < 0.85f -> 5 // Special
-                    else -> 0
-                }
-            }
-        }
-        val toward = if (dir > 0) 1 else 0
-        val away = if (dir > 0) 0 else 1
-        when (aiPlan) {
-            1 -> held[toward] = true
-            7 -> { held[toward] = true; if (aiFresh) held[2] = true }
-            2 -> { if (aiFresh) held[3] = true else if (dist > 110f) held[toward] = true }
-            3 -> { if (aiFresh) held[4] = true else if (dist > 130f) held[toward] = true }
-            4 -> held[6] = true
-            5 -> { if (aiFresh) held[5] = true }
-            6 -> { held[7] = true; if (aiFresh) held[if (rnd.nextBoolean()) 3 else 4] = true }
-            8 -> { if (aiFresh) held[8] = true else held[toward] = true }
-        }
+        ai.think(this, opp)
     }
 
     fun update(opp: Fighter) {

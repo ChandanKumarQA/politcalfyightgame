@@ -32,14 +32,15 @@ class Renderer(private val ctx: Context, private val g: Game) {
     private val gold = 0xFFFFC83D.toInt()
     private val orange = 0xFFFF5A36.toInt()
 
-    private val bmpCache = HashMap<String, Bitmap>()
+    private val bmpCache = HashMap<String, Bitmap?>()
     private fun getBmp(resName: String): Bitmap? {
-        return bmpCache.getOrPut(resName) {
-            try {
-                val id = ctx.resources.getIdentifier(resName, "drawable", ctx.packageName)
-                if (id != 0) BitmapFactory.decodeResource(ctx.resources, id) else null
-            } catch (_: Exception) { null }
-        }
+        if (bmpCache.containsKey(resName)) return bmpCache[resName]
+        val bmp = try {
+            val id = ctx.resources.getIdentifier(resName, "drawable", ctx.packageName)
+            if (id != 0) BitmapFactory.decodeResource(ctx.resources, id) else null
+        } catch (_: Exception) { null }
+        bmpCache[resName] = bmp
+        return bmp
     }
 
     fun draw(c: Canvas) {

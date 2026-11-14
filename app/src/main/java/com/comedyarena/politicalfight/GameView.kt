@@ -99,14 +99,15 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
     @Volatile private var pending: (() -> Unit)? = null
     private var pauseRect = RectF(760f, 130f, 840f, 180f)
 
-    private val avatarCache = HashMap<String, Bitmap>()
+    private val avatarCache = HashMap<String, Bitmap?>()
     private fun getAvatar(name: String): Bitmap? {
-        return avatarCache.getOrPut(name) {
-            try {
-                val resId = context.resources.getIdentifier(name, "drawable", context.packageName)
-                if (resId != 0) BitmapFactory.decodeResource(context.resources, resId) else null
-            } catch (e: Exception) { null }
-        }
+        if (avatarCache.containsKey(name)) return avatarCache[name]
+        val bmp = try {
+            val resId = context.resources.getIdentifier(name, "drawable", context.packageName)
+            if (resId != 0) BitmapFactory.decodeResource(context.resources, resId) else null
+        } catch (e: Exception) { null }
+        avatarCache[name] = bmp
+        return bmp
     }
 
     init {

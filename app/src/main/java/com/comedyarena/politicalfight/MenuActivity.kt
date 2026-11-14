@@ -33,36 +33,34 @@ import android.widget.Toast
 import kotlin.math.max
 import kotlin.math.min
 
-/** Animated or picture portrait of a hero */
-class PortraitView(ctx: Context, val hero: Hero) : View(ctx) {
+/** Animated cartoon caricature portrait of a hero */
+class PortraitView(ctx: Context, val hero: Hero, private val bustOnly: Boolean = false) : View(ctx) {
     private val f = Fighter(hero, 0f, false).also { it.portrait = true; it.y = 0f }
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    private var bmp: Bitmap? = null
-
-    init {
-        try {
-            val resId = resources.getIdentifier(hero.drawableName, "drawable", context.packageName)
-            if (resId != 0) {
-                bmp = BitmapFactory.decodeResource(resources, resId)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
 
     override fun onDraw(c: Canvas) {
-        val b = bmp
-        if (b != null) {
-            val dst = RectF(0f, 0f, width.toFloat(), height.toFloat())
-            c.drawBitmap(b, null, dst, p)
-        } else {
-            val s = height / 300f
-            f.anim += 0.15f
-            c.save(); c.translate(width / 2f, height - 10f); c.scale(s, s)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return
+
+        f.anim += 0.12f
+        c.save()
+        c.clipRect(0f, 0f, w, h)
+        if (bustOnly) {
+            // Focus on expressive caricature head & upper chest for selection cards
+            val s = (h * 0.90f) / 160f
+            c.translate(w / 2f, h / 2f + 175f * s)
+            c.scale(s, s)
             f.draw(c, p)
-            c.restore()
-            postInvalidateOnAnimation()
+        } else {
+            // Full standing animated fighter for main menu
+            val s = (h - 20f) / 260f
+            c.translate(w / 2f, h - 10f)
+            c.scale(s, s)
+            f.draw(c, p)
         }
+        c.restore()
+        postInvalidateOnAnimation()
     }
 }
 
@@ -195,9 +193,43 @@ class MenuActivity : Activity() {
         left.addView(tv("★ THE GREAT POWER BATTLE ★", 17f, 0xFFFFAB00.toInt()))
         val fr = LinearLayout(this); fr.gravity = Gravity.CENTER
         val a = Prefs.hero
-        fr.addView(PortraitView(this, heroes[a]), lp(dp(125), dp(160)))
+
+        fun makeFighterCard(h: Hero, badgeText: String, badgeColor: Int, strokeColor: Int, onClick: () -> Unit): LinearLayout {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(dp(8), dp(6), dp(8), dp(8))
+                val bg = GradientDrawable().apply {
+                    cornerRadius = dp(14).toFloat()
+                    setColor(0xFF221510.toInt())
+                    setStroke(dp(3), strokeColor)
+                }
+                background = bg
+                setOnClickListener { Sfx.click(); onClick() }
+            }
+            val b = TextView(this).apply {
+                text = badgeText; textSize = 10f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                background = GradientDrawable().apply { cornerRadius = dp(6).toFloat(); setColor(badgeColor) }
+                setPadding(dp(8), dp(2), dp(8), dp(2))
+            }
+            card.addView(b, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0f, 2))
+            card.addView(PortraitView(this, h, bustOnly = false), lp(dp(110), dp(135)))
+            val name = tv(h.name, 12f, 0xFFFFEB3B.toInt())
+            name.typeface = Typeface.DEFAULT_BOLD
+            card.addView(name)
+            return card
+        }
+
+        val p1Card = makeFighterCard(heroes[a], "1P", 0xFFE65100.toInt(), 0xFFFF9800.toInt()) {
+            charSelect("CHOOSE YOUR FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; showHome() }
+        }
+        val p2Card = makeFighterCard(heroes[(a + 1) % heroes.size], "CPU", 0xFF0288D1.toInt(), 0xFF03A9F4.toInt()) {
+            charSelect("CHOOSE OPPONENT", (a + 1) % heroes.size) { _, _ -> showHome() }
+        }
+        fr.addView(p1Card, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0f, 6))
         fr.addView(tv("VS", 24f, 0xFFFFEB3B.toInt()))
-        fr.addView(PortraitView(this, heroes[(a + 1) % heroes.size]), lp(dp(125), dp(160)))
+        fr.addView(p2Card, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0f, 6))
         left.addView(fr)
         left.addView(tv("Best score: ${Prefs.best}   |   Levels: ${Prefs.unlocked}/500", 13f, Color.WHITE, false))
         left.addView(tv("All characters and events are fictional political parody.\nNo real person is depicted or promoted.", 10f, 0xCCFFFFFF.toInt(), false))
@@ -523,12 +555,17 @@ class MenuActivity : Activity() {
                 val g = GradientDrawable(); g.cornerRadius = dp(14).toFloat()
                 if (i == sel) {
                     g.setColor(0xFF381F19.toInt())
-                    g.setStroke(dp(4), 0xFFFF9800.toInt()) // Gold glowing border
+                    g.setStroke(dp(3), 0xFFFF9800.toInt()) // Gold glowing border
                 } else {
                     g.setColor(0xFF221510.toInt())
                     g.setStroke(dp(2), 0xFF4A342A.toInt())
                 }
                 cd.background = g
+                if (cd.childCount >= 3 && cd.getChildAt(2) is TextView) {
+                    val tv = cd.getChildAt(2) as TextView
+                    tv.setTextColor(if (i == sel) 0xFFFFEB3B.toInt() else Color.WHITE)
+                    tv.typeface = if (i == sel) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                }
             }
         }
 
@@ -552,17 +589,13 @@ class MenuActivity : Activity() {
             badge.setPadding(dp(8), dp(2), dp(8), dp(2))
             cd.addView(badge, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0f, 2))
 
-            // Character Card Image / Portrait
-            val iv = ImageView(this)
-            val resId = resources.getIdentifier(h.drawableName, "drawable", packageName)
-            if (resId != 0) {
-                iv.setImageResource(resId)
-                iv.scaleType = ImageView.ScaleType.FIT_CENTER
-            }
-            cd.addView(iv, lp(dp(95), dp(115)))
+            // Animated Cartoon Caricature Portrait (Vector, Not Photo!)
+            val pv = PortraitView(this, h, bustOnly = true)
+            cd.addView(pv, lp(dp(95), dp(115)))
 
             // Name bar at bottom of card
             val nameTv = tv(h.name, 12f, if (idx == sel) 0xFFFFEB3B.toInt() else Color.WHITE)
+            nameTv.typeface = if (idx == sel) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             cd.addView(nameTv)
 
             cd.setOnClickListener {
@@ -581,15 +614,19 @@ class MenuActivity : Activity() {
         trBadge.text = "CH. 2"; trBadge.setTextColor(Color.WHITE)
         val trBg = GradientDrawable(); trBg.cornerRadius = dp(6).toFloat(); trBg.setColor(0xFF00ACC1.toInt()); trBadge.background = trBg
         trBadge.setPadding(dp(8), dp(2), dp(8), dp(2)); trailerCd.addView(trBadge, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0f, 2))
-        val trIv = ImageView(this); val trRes = resources.getIdentifier("face_trailer", "drawable", packageName)
-        if (trRes != 0) trIv.setImageResource(trRes)
-        trailerCd.addView(trIv, lp(dp(95), dp(115)))
+
+        val trIcon = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+            addView(tv("🎬", 34f))
+            addView(tv("COMING SOON", 10f, 0xFF00E5FF.toInt()))
+        }
+        trailerCd.addView(trIcon, lp(dp(95), dp(115)))
         trailerCd.addView(tv("TRAILER", 12f, 0xFF00E5FF.toInt()))
         val gTr = GradientDrawable(); gTr.cornerRadius = dp(14).toFloat(); gTr.setColor(0xFF1B2428.toInt()); gTr.setStroke(dp(2), 0xFF00ACC1.toInt())
         trailerCd.background = gTr
         trailerCd.setOnClickListener {
             Sfx.click()
-            tv("Chapter 2 coming soon!", 14f)
+            Toast.makeText(this, "Chapter 2 coming soon in next update!", Toast.LENGTH_SHORT).show()
         }
         rowL.addView(trailerCd, lp(dp(110), ViewGroup.LayoutParams.WRAP_CONTENT, 0f, 4))
 
@@ -600,9 +637,13 @@ class MenuActivity : Activity() {
         rndBadge.text = "?"; rndBadge.setTextColor(Color.WHITE)
         val rndBg = GradientDrawable(); rndBg.cornerRadius = dp(6).toFloat(); rndBg.setColor(0xFFE53935.toInt()); rndBadge.background = rndBg
         rndBadge.setPadding(dp(8), dp(2), dp(8), dp(2)); rndCd.addView(rndBadge, lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0f, 2))
-        val rndIv = ImageView(this); val rndRes = resources.getIdentifier("face_random", "drawable", packageName)
-        if (rndRes != 0) rndIv.setImageResource(rndRes)
-        rndCd.addView(rndIv, lp(dp(95), dp(115)))
+
+        val rndIcon = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+            addView(tv("🎲", 36f))
+            addView(tv("SURPRISE", 10f, 0xFFFFCA28.toInt()))
+        }
+        rndCd.addView(rndIcon, lp(dp(95), dp(115)))
         rndCd.addView(tv("RANDOM", 12f, 0xFFFFCA28.toInt()))
         val gRnd = GradientDrawable(); gRnd.cornerRadius = dp(14).toFloat(); gRnd.setColor(0xFF281E1B.toInt()); gRnd.setStroke(dp(2), 0xFFE53935.toInt())
         rndCd.background = gRnd

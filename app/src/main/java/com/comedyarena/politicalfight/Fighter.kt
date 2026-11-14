@@ -353,6 +353,31 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         p.strokeCap = Paint.Cap.BUTT
     }
 
+    /**
+     * Draw cartoon caricature head inside a HUD box or portrait frame.
+     */
+    fun drawHeadInBox(c: Canvas, p: Paint, cx: Float, cy: Float, scale: Float = 1f, facingLeft: Boolean = false) {
+        c.save()
+        c.translate(cx, cy)
+        c.scale(if (facingLeft) -scale else scale, scale)
+        val OUT = 0xFF1B1B1B.toInt()
+        fun circ(x: Float, y: Float, r: Float, col: Int) {
+            p.style = Paint.Style.FILL; p.color = col; c.drawCircle(x, y, r, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT; c.drawCircle(x, y, r, p)
+        }
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float, w: Float, col: Int) {
+            p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND; p.strokeWidth = w; p.color = col
+            c.drawLine(x1, y1, x2, y2, p)
+        }
+        fun rr(l: Float, t: Float, r: Float, b: Float, rad: Float, col: Int) {
+            p.style = Paint.Style.FILL; p.color = col; c.drawRoundRect(RectF(l, t, r, b), rad, rad, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT; c.drawRoundRect(RectF(l, t, r, b), rad, rad, p)
+        }
+        drawCartoonHead(c, p, 0f, 0f, false, false, OUT, ::circ, ::line, ::rr)
+        c.restore()
+        p.strokeCap = Paint.Cap.BUTT
+    }
+
     private fun drawCartoonHead(
         c: Canvas, p: Paint, cx: Float, cy: Float,
         dead: Boolean, mouth: Boolean, OUT: Int,

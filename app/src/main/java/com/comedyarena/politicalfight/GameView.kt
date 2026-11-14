@@ -192,37 +192,46 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
 
     private fun buildControls() {
         btns.clear()
-        fun add(pl: Int, code: Int, label: String, x: Float, y: Float, s: Float, col: Int) {
-            btns.add(Btn(RectF(x, y, x + s, y + s), label, pl, code, col))
+        fun add(pl: Int, code: Int, label: String, r: RectF, col: Int) {
+            btns.add(Btn(r, label, pl, code, col))
         }
         val midX = W / 2f
         pauseRect = RectF(midX - 45f, 125f, midX + 45f, 175f)
 
         if (cfg.mode != "two") {
-            val s = 135f
-            // Left D-Pad Controls: Move Left, Move Right, Jump Up, Crouch Down
-            add(0, 0, "◀", 35f, 650f, s, 0xFF42A5F5.toInt())
-            add(0, 1, "▶", 215f, 650f, s, 0xFF42A5F5.toInt())
-            add(0, 2, "JUMP", 125f, 520f, s, 0xFF66BB6A.toInt())
-            add(0, 7, "CROUCH", 125f, 755f, s, 0xFF5C6BC0.toInt())
+            // --- LEFT SIDE: 2x2 D-PAD Movement (0% Overlap) ---
+            // Row 1: y = 585f..700f; Row 2: y = 720f..835f (height = 115f, gap = 20f)
+            // Col 1: x = 35f..160f; Col 2: x = 178f..303f (width = 125f, gap = 18f)
+            add(0, 2, "JUMP",   RectF(35f, 585f, 160f, 700f), 0xFF66BB6A.toInt()) // Up
+            add(0, 7, "CROUCH", RectF(178f, 585f, 303f, 700f), 0xFF5C6BC0.toInt()) // Down
+            add(0, 0, "◀",      RectF(35f, 720f, 160f, 835f), 0xFF42A5F5.toInt()) // Left
+            add(0, 1, "▶",      RectF(178f, 720f, 303f, 835f), 0xFF42A5F5.toInt()) // Right
 
-            // Right Combat Buttons: Block, Punch, Kick, Grab, Special
-            add(0, 6, "BLOCK", W - 530f, 725f, s, 0xFF78909C.toInt())
-            add(0, 3, "PUNCH", W - 370f, 725f, s, 0xFFEF5350.toInt())
-            add(0, 4, "KICK", W - 210f, 725f, s, 0xFFFFA726.toInt())
-            add(0, 8, "GRAB", W - 450f, 550f, 130f, 0xFF8D6E63.toInt())
-            // SPECIAL button placed prominently in top-right
-            add(0, 5, "SPECIAL", W - 270f, 530f, 150f, 0xFFAB47BC.toInt())
+            // --- RIGHT SIDE: Combat Actions (2 Rows, 3 Columns, 0% Overlap) ---
+            // Row 1: y = 585f..700f; Row 2: y = 720f..835f (height = 115f, gap = 20f)
+            // Col 1: W-385..W-275; Col 2: W-260..W-150; Col 3: W-135..W-25 (width = 110f, gap = 15f)
+            // Col 1, Row 1 is kept empty so it never covers the fighter!
+            add(0, 8, "GRAB",    RectF(W - 260f, 585f, W - 150f, 700f), 0xFF8D6E63.toInt())
+            add(0, 5, "SPECIAL", RectF(W - 135f, 585f, W - 25f,  700f), 0xFFAB47BC.toInt())
+
+            add(0, 6, "BLOCK",   RectF(W - 385f, 720f, W - 275f, 835f), 0xFF78909C.toInt())
+            add(0, 3, "PUNCH",   RectF(W - 260f, 720f, W - 150f, 835f), 0xFFEF5350.toInt())
+            add(0, 4, "KICK",    RectF(W - 135f, 720f, W - 25f,  835f), 0xFFFFA726.toInt())
         } else {
-            val s = 100f; val st = 110f
+            val s = 95f; val st = 105f
             for (pl in 0..1) {
                 val bx = if (pl == 0) 24f else W - 24f - (4 * st + s)
-                val y1 = H - s - 16f; val y2 = y1 - st
-                add(pl, 0, "◀", bx, y1, s, 0xFF42A5F5.toInt()); add(pl, 1, "▶", bx + st, y1, s, 0xFF42A5F5.toInt())
-                add(pl, 2, "JUMP", bx + 2 * st, y1, s, 0xFF66BB6A.toInt()); add(pl, 7, "DOWN", bx + 3 * st, y1, s, 0xFF5C6BC0.toInt())
-                add(pl, 6, "BLOCK", bx + 4 * st, y1, s, 0xFF78909C.toInt())
-                add(pl, 3, "PUNCH", bx, y2, s, 0xFFEF5350.toInt()); add(pl, 4, "KICK", bx + st, y2, s, 0xFFFFA726.toInt())
-                add(pl, 8, "GRAB", bx + 2 * st, y2, s, 0xFF8D6E63.toInt()); add(pl, 5, "SPECIAL", bx + 3 * st, y2, s, 0xFFAB47BC.toInt())
+                val y1 = 730f; val y2 = 615f
+                add(pl, 0, "◀", RectF(bx, y1, bx + s, y1 + s), 0xFF42A5F5.toInt())
+                add(pl, 1, "▶", RectF(bx + st, y1, bx + st + s, y1 + s), 0xFF42A5F5.toInt())
+                add(pl, 2, "JUMP", RectF(bx + 2 * st, y1, bx + 2 * st + s, y1 + s), 0xFF66BB6A.toInt())
+                add(pl, 7, "DOWN", RectF(bx + 3 * st, y1, bx + 3 * st + s, y1 + s), 0xFF5C6BC0.toInt())
+                add(pl, 6, "BLOCK", RectF(bx + 4 * st, y1, bx + 4 * st + s, y1 + s), 0xFF78909C.toInt())
+
+                add(pl, 3, "PUNCH", RectF(bx, y2, bx + s, y2 + s), 0xFFEF5350.toInt())
+                add(pl, 4, "KICK", RectF(bx + st, y2, bx + st + s, y2 + s), 0xFFFFA726.toInt())
+                add(pl, 8, "GRAB", RectF(bx + 2 * st, y2, bx + 2 * st + s, y2 + s), 0xFF8D6E63.toInt())
+                add(pl, 5, "SPECIAL", RectF(bx + 3 * st, y2, bx + 3 * st + s, y2 + s), 0xFFAB47BC.toInt())
             }
         }
     }
@@ -544,9 +553,7 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
                 if (a == MotionEvent.ACTION_POINTER_UP && i == e.actionIndex) continue
                 val (x, y) = toWorld(e.getX(i), e.getY(i))
                 for (b in btns) {
-                    val pad = if (b.code == 5) 24f else 8f
-                    val hit = RectF(b.r.left - pad, b.r.top - pad, b.r.right + pad, b.r.bottom + pad)
-                    if (hit.contains(x, y)) held[b.player][b.code] = true
+                    if (b.r.contains(x, y)) held[b.player][b.code] = true
                 }
             }
         }
@@ -642,15 +649,15 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
 
     private fun drawHud(c: Canvas) {
         val f1 = p1.hp / p1.maxHp; val f2 = p2.hp / p2.maxHp
-        val b1 = p1.headBmp
-        val b2 = p2.headBmp
 
         // --- P1 Avatar Portrait Box (Left) ---
         val r1 = RectF(30f, 28f, 122f, 120f)
         paint.style = Paint.Style.FILL; paint.color = 0xFF201612.toInt(); c.drawRoundRect(r1, 14f, 14f, paint)
-        if (b1 != null) {
-            c.drawBitmap(b1, null, RectF(34f, 32f, 118f, 116f), paint)
-        }
+        c.save()
+        val clipPath1 = Path().apply { addRoundRect(r1, 14f, 14f, Path.Direction.CW) }
+        c.clipPath(clipPath1)
+        p1.drawHeadInBox(c, paint, r1.centerX(), r1.centerY() + 4f, 0.82f, facingLeft = false)
+        c.restore()
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f; paint.color = 0xFFFF9800.toInt()
         c.drawRoundRect(r1, 14f, 14f, paint)
         // 1P Badge
@@ -662,9 +669,11 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         // --- P2 Avatar Portrait Box (Right) ---
         val r2 = RectF(W - 122f, 28f, W - 30f, 120f)
         paint.style = Paint.Style.FILL; paint.color = 0xFF201612.toInt(); c.drawRoundRect(r2, 14f, 14f, paint)
-        if (b2 != null) {
-            c.drawBitmap(b2, null, RectF(W - 118f, 32f, W - 34f, 116f), paint)
-        }
+        c.save()
+        val clipPath2 = Path().apply { addRoundRect(r2, 14f, 14f, Path.Direction.CW) }
+        c.clipPath(clipPath2)
+        p2.drawHeadInBox(c, paint, r2.centerX(), r2.centerY() + 4f, 0.82f, facingLeft = true)
+        c.restore()
         paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f; paint.color = 0xFF03A9F4.toInt()
         c.drawRoundRect(r2, 14f, 14f, paint)
         // CPU/2P Badge
@@ -750,7 +759,7 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         for (b in btns) {
             val pr = held[b.player][b.code]
             val isSpecial = b.code == 5
-            val alpha = if (pr) 0xF0 else if (isSpecial) 0xDD else 0x99
+            val alpha = if (pr) 0xF5 else if (isSpecial) 0xDD else 0xA0
 
             // SPECIAL button always glows gold and stands out
             val col = if (isSpecial) {
@@ -758,14 +767,14 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
             } else b.col
 
             paint.style = Paint.Style.FILL; paint.color = (col and 0x00FFFFFF) or (alpha shl 24)
-            c.drawRoundRect(b.r, 26f, 26f, paint)
+            c.drawRoundRect(b.r, 22f, 22f, paint)
 
-            val borderCol = if (isSpecial) 0xFFFFD700.toInt() else 0xCCFFFFFF.toInt()
-            paint.style = Paint.Style.STROKE; paint.strokeWidth = if (isSpecial) 6f else 4f; paint.color = borderCol
-            c.drawRoundRect(b.r, 26f, 26f, paint)
+            val borderCol = if (isSpecial) 0xFFFFD700.toInt() else if (pr) Color.WHITE else 0xCCFFFFFF.toInt()
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = if (isSpecial) 5f else if (pr) 4f else 3f; paint.color = borderCol
+            c.drawRoundRect(b.r, 22f, 22f, paint)
 
             val s = b.r.width()
-            val size = if (b.label.length > 4) s * 0.20f else if (b.label.length > 2) s * 0.26f else s * 0.44f
+            val size = if (b.label.length > 5) s * 0.19f else if (b.label.length > 3) s * 0.24f else if (b.label.length > 1) s * 0.28f else s * 0.42f
             drawOutlined(c, b.label, b.r.centerX(), b.r.centerY() + size / 3f, size, Color.WHITE)
         }
     }

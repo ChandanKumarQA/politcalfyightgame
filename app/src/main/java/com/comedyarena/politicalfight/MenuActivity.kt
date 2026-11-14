@@ -30,6 +30,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import kotlin.math.max
+import kotlin.math.min
 
 /** Animated or picture portrait of a hero */
 class PortraitView(ctx: Context, val hero: Hero) : View(ctx) {

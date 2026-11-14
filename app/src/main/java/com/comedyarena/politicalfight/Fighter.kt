@@ -341,35 +341,9 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         rr(-38f, -178f + bob, 38f, -88f + bob, 28f, hero.primaryColor)
         p.style = Paint.Style.FILL; p.color = 0x55FFFFFF; c.drawRect(-36f, -138f + bob, 36f, -124f + bob, p)
 
-        // head
+        // cartoon caricature head
         val cx = 4f; val cy = -212f + bob
-        val hb = headBmp
-        if (hb != null) {
-            val hw = 96f; val hh = 104f
-            val dst = RectF(cx - hw / 2f + 4f, cy - hh / 2f - 4f, cx + hw / 2f + 4f, cy + hh / 2f - 4f)
-            c.drawBitmap(hb, null, dst, p)
-            if (dead) {
-                p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = 0xFFFFD700.toInt()
-                c.drawCircle(cx + 4f, cy - 35f, 18f, p)
-            }
-        } else {
-            circ(cx, cy, 38f, hero.skinColor)
-            circ(cx + 36f, cy + 8f, 7f, hero.skinColor)
-            if (dead) {
-                line(cx + 2f, cy - 10f, cx + 16f, cy + 4f, 4f, OUT); line(cx + 16f, cy - 10f, cx + 2f, cy + 4f, 4f, OUT)
-                line(cx + 20f, cy - 10f, cx + 34f, cy + 4f, 4f, OUT); line(cx + 34f, cy - 10f, cx + 20f, cy + 4f, 4f, OUT)
-            } else {
-                circ(cx + 10f, cy - 4f, 9f, 0xFFFFFFFF.toInt()); circ(cx + 28f, cy - 4f, 8f, 0xFFFFFFFF.toInt())
-                circ(cx + 13f, cy - 4f, 4f, OUT); circ(cx + 31f, cy - 4f, 4f, OUT)
-                line(cx + 2f, cy - 18f, cx + 18f, cy - 14f, 4f, OUT); line(cx + 22f, cy - 14f, cx + 36f, cy - 18f, 4f, OUT)
-            }
-            if (mouth || dead) {
-                p.style = Paint.Style.FILL; p.color = 0xFF8B0000.toInt(); c.drawOval(cx + 6f, cy + 14f, cx + 30f, cy + 32f, p)
-            } else {
-                val pa = Path(); pa.moveTo(cx + 6f, cy + 18f); pa.quadTo(cx + 18f, cy + 32f, cx + 30f, cy + 18f)
-                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(pa, p)
-            }
-        }
+        drawCartoonHead(c, p, cx, cy, dead, mouth, OUT, ::circ, ::line, ::rr)
         // front arm
         limb(18f, -160f + bob, fHx, fHy, 20f, hero.primaryColor); circ(fHx, fHy, 14f, hero.skinColor)
         c.restore()
@@ -377,5 +351,214 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         limb(8f, hipY, fFx, fFy, 24f, pants); circ(fFx + 6f, fFy - 4f, 13f, 0xFF4E342E.toInt())
         c.restore()
         p.strokeCap = Paint.Cap.BUTT
+    }
+
+    private fun drawCartoonHead(
+        c: Canvas, p: Paint, cx: Float, cy: Float,
+        dead: Boolean, mouth: Boolean, OUT: Int,
+        circ: (Float, Float, Float, Int) -> Unit,
+        line: (Float, Float, Float, Float, Float, Int) -> Unit,
+        rr: (Float, Float, Float, Float, Float, Int) -> Unit
+    ) {
+        // Base Cartoon Head & Ears
+        if (hero.id == 10) {
+            circ(cx - 36f, cy + 2f, 15f, hero.skinColor) // Mbapu big ears
+        } else {
+            circ(cx - 30f, cy + 2f, 10f, hero.skinColor)
+        }
+        circ(cx, cy, 38f, hero.skinColor)
+        circ(cx + 34f, cy + 8f, 7f, hero.skinColor) // nose
+
+        // Politician-Specific Facial Caricature Features
+        when (hero.id) {
+            0 -> { // MITRAMAN: White side hair, trimmed white beard & mustache, rimless glasses
+                p.style = Paint.Style.FILL; p.color = 0xFFEEEEEE.toInt()
+                c.drawArc(RectF(cx - 40f, cy - 38f, cx + 8f, cy + 18f), 100f, 160f, true, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+                c.drawArc(RectF(cx - 40f, cy - 38f, cx + 8f, cy + 18f), 100f, 160f, true, p)
+
+                p.style = Paint.Style.FILL; p.color = 0xFFF5F5F5.toInt()
+                val bp = Path().apply {
+                    moveTo(cx - 16f, cy + 12f)
+                    quadTo(cx + 10f, cy + 42f, cx + 36f, cy + 22f)
+                    quadTo(cx + 26f, cy + 10f, cx + 10f, cy + 12f)
+                    close()
+                }
+                c.drawPath(bp, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT; c.drawPath(bp, p)
+                rr(cx + 8f, cy + 10f, cx + 35f, cy + 19f, 5f, 0xFFEEEEEE.toInt())
+
+                if (!dead) {
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0xFF222222.toInt()
+                    c.drawRoundRect(RectF(cx + 6f, cy - 10f, cx + 19f, cy + 2f), 3f, 3f, p)
+                    c.drawRoundRect(RectF(cx + 23f, cy - 10f, cx + 36f, cy + 2f), 3f, 3f, p)
+                    c.drawLine(cx + 19f, cy - 4f, cx + 23f, cy - 4f, p)
+                }
+            }
+            1 -> { // YATRA BOY: Wavy dark hair, scruffy full beard
+                p.style = Paint.Style.FILL; p.color = 0xFF2B2522.toInt()
+                c.drawArc(RectF(cx - 38f, cy - 42f, cx + 38f, cy + 10f), 160f, 200f, true, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+                c.drawArc(RectF(cx - 38f, cy - 42f, cx + 38f, cy + 10f), 160f, 200f, true, p)
+
+                p.style = Paint.Style.FILL; p.color = 0xFF352E2B.toInt()
+                val bp = Path().apply {
+                    moveTo(cx - 24f, cy + 8f)
+                    quadTo(cx + 8f, cy + 45f, cx + 38f, cy + 26f)
+                    quadTo(cx + 24f, cy + 14f, cx + 4f, cy + 15f)
+                    close()
+                }
+                c.drawPath(bp, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT; c.drawPath(bp, p)
+                rr(cx + 6f, cy + 9f, cx + 36f, cy + 18f, 5f, 0xFF352E2B.toInt())
+            }
+            2 -> { // DEEDEE: Saree pallu border, chignon bun, bindi, glasses
+                circ(cx - 36f, cy + 8f, 15f, 0xFF1A1A1A.toInt())
+                p.style = Paint.Style.FILL; p.color = 0xFFFAFAFA.toInt()
+                c.drawArc(RectF(cx - 40f, cy - 40f, cx + 34f, cy + 15f), 140f, 190f, true, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 6f; p.color = 0xFF1976D2.toInt()
+                c.drawArc(RectF(cx - 40f, cy - 40f, cx + 34f, cy + 15f), 140f, 190f, false, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+                c.drawArc(RectF(cx - 40f, cy - 40f, cx + 34f, cy + 15f), 140f, 190f, false, p)
+
+                p.style = Paint.Style.FILL; p.color = 0xFFD32F2F.toInt()
+                c.drawCircle(cx + 18f, cy - 14f, 4f, p)
+
+                if (!dead) {
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0xFF212121.toInt()
+                    c.drawCircle(cx + 12f, cy - 4f, 8f, p)
+                    c.drawCircle(cx + 28f, cy - 4f, 8f, p)
+                    c.drawLine(cx + 20f, cy - 4f, cx + 22f, cy - 4f, p)
+                }
+            }
+            3 -> { // TARIFF TAAU: Golden swept-forward quiff
+                p.style = Paint.Style.FILL; p.color = 0xFFFFD54F.toInt()
+                val hp = Path().apply {
+                    moveTo(cx - 38f, cy - 20f)
+                    cubicTo(cx - 40f, cy - 54f, cx + 10f, cy - 60f, cx + 46f, cy - 38f)
+                    cubicTo(cx + 48f, cy - 24f, cx + 30f, cy - 20f, cx + 16f, cy - 28f)
+                    close()
+                }
+                c.drawPath(hp, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(hp, p)
+                rr(-5f, -145f, 5f, -100f, 3f, 0xFFD50000.toInt()) // Red tie
+            }
+            4 -> { // DOZER DADA: Bald saffron dome, tilak, gold earring
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0xFFE65100.toInt()
+                c.drawLine(cx + 8f, cy - 22f, cx + 28f, cy - 22f, p)
+                c.drawLine(cx + 6f, cy - 17f, cx + 30f, cy - 17f, p)
+                p.color = 0xFFD50000.toInt(); c.drawCircle(cx + 18f, cy - 17f, 3f, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0xFFFFD700.toInt()
+                c.drawCircle(cx - 30f, cy + 9f, 5f, p)
+            }
+            5 -> { // TOLL MAN: Groomed mustache & side-parted hair
+                p.style = Paint.Style.FILL; p.color = 0xFF212121.toInt()
+                c.drawArc(RectF(cx - 38f, cy - 40f, cx + 38f, cy + 4f), 180f, 180f, true, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+                c.drawArc(RectF(cx - 38f, cy - 40f, cx + 38f, cy + 4f), 180f, 180f, true, p)
+                rr(cx + 8f, cy + 12f, cx + 36f, cy + 20f, 5f, 0xFF212121.toInt())
+            }
+            6 -> { // SUTTI BABU: Voluminous puff hair, designer dark glasses
+                p.style = Paint.Style.FILL; p.color = 0xFF1C1917.toInt()
+                c.drawArc(RectF(cx - 32f, cy - 50f, cx + 36f, cy), 170f, 190f, true, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+                c.drawArc(RectF(cx - 32f, cy - 50f, cx + 36f, cy), 170f, 190f, true, p)
+                if (!dead) {
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0xFF111111.toInt()
+                    c.drawRoundRect(RectF(cx + 6f, cy - 10f, cx + 19f, cy + 3f), 4f, 4f, p)
+                    c.drawRoundRect(RectF(cx + 23f, cy - 10f, cx + 36f, cy + 3f), 4f, 4f, p)
+                    c.drawLine(cx + 19f, cy - 4f, cx + 23f, cy - 4f, p)
+                }
+            }
+            7 -> { // RAIL RAJA: White side puffs, round spectacles
+                circ(cx - 32f, cy + 6f, 14f, 0xFFEEEEEE.toInt())
+                circ(cx + 8f, cy - 28f, 10f, 0xFFEEEEEE.toInt())
+                if (!dead) {
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+                    c.drawCircle(cx + 12f, cy - 4f, 9f, p)
+                    c.drawCircle(cx + 28f, cy - 4f, 9f, p)
+                    c.drawLine(cx + 20f, cy - 4f, cx + 22f, cy - 4f, p)
+                }
+            }
+            8 -> { // GHAR MANTRI: Full white beard & mustache, dark-rim glasses
+                p.style = Paint.Style.FILL; p.color = 0xFFF0F0F0.toInt()
+                val bp = Path().apply {
+                    moveTo(cx - 18f, cy + 10f)
+                    quadTo(cx + 10f, cy + 45f, cx + 38f, cy + 24f)
+                    quadTo(cx + 28f, cy + 12f, cx + 12f, cy + 14f)
+                    close()
+                }
+                c.drawPath(bp, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT; c.drawPath(bp, p)
+                rr(cx + 6f, cy + 10f, cx + 36f, cy + 20f, 6f, 0xFFF0F0F0.toInt())
+                if (!dead) {
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+                    c.drawRoundRect(RectF(cx + 6f, cy - 10f, cx + 19f, cy + 2f), 3f, 3f, p)
+                    c.drawRoundRect(RectF(cx + 23f, cy - 10f, cx + 36f, cy + 2f), 3f, 3f, p)
+                    c.drawLine(cx + 19f, cy - 4f, cx + 23f, cy - 4f, p)
+                }
+            }
+            9 -> { // FACT BHAI: Modern clean styled hair & stubble
+                p.style = Paint.Style.FILL; p.color = 0xFF212121.toInt()
+                c.drawArc(RectF(cx - 36f, cy - 44f, cx + 34f, cy + 4f), 170f, 190f, true, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+                c.drawArc(RectF(cx - 36f, cy - 44f, cx + 34f, cy + 4f), 170f, 190f, true, p)
+                p.style = Paint.Style.FILL; p.color = 0x44000000
+                c.drawRoundRect(RectF(cx - 10f, cy + 16f, cx + 34f, cy + 34f), 8f, 8f, p)
+                if (!dead) {
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0xFF37474F.toInt()
+                    c.drawRoundRect(RectF(cx + 8f, cy - 10f, cx + 20f, cy + 2f), 3f, 3f, p)
+                    c.drawRoundRect(RectF(cx + 23f, cy - 10f, cx + 35f, cy + 2f), 3f, 3f, p)
+                }
+            }
+            10 -> { // MBAPU (BOSS): Round spectacles, white drooping mustache
+                if (!dead) {
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+                    c.drawCircle(cx + 12f, cy - 4f, 10f, p)
+                    c.drawCircle(cx + 28f, cy - 4f, 10f, p)
+                    c.drawLine(cx + 20f, cy - 4f, cx + 22f, cy - 4f, p)
+                    c.drawLine(cx + 4f, cy - 4f, cx - 18f, cy - 2f, p)
+                }
+                rr(cx + 8f, cy + 12f, cx + 36f, cy + 22f, 6f, 0xFFEEEEEE.toInt())
+            }
+            else -> { // Default / Random / Trailer: Clean hairstyle
+                p.style = Paint.Style.FILL; p.color = 0xFF212121.toInt()
+                c.drawArc(RectF(cx - 36f, cy - 42f, cx + 36f, cy + 4f), 180f, 180f, true, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+                c.drawArc(RectF(cx - 36f, cy - 42f, cx + 36f, cy + 4f), 180f, 180f, true, p)
+            }
+        }
+
+        // Animated Expressive Eyes or KO state
+        if (dead) {
+            line(cx + 4f, cy - 10f, cx + 18f, cy + 4f, 4f, OUT)
+            line(cx + 18f, cy - 10f, cx + 4f, cy + 4f, 4f, OUT)
+            line(cx + 22f, cy - 10f, cx + 36f, cy + 4f, 4f, OUT)
+            line(cx + 36f, cy - 10f, cx + 22f, cy + 4f, 4f, OUT)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = 0xFFFFD700.toInt()
+            c.drawOval(RectF(cx - 16f, cy - 56f, cx + 26f, cy - 44f), p)
+        } else {
+            circ(cx + 11f, cy - 4f, 8f, 0xFFFFFFFF.toInt())
+            circ(cx + 28f, cy - 4f, 8f, 0xFFFFFFFF.toInt())
+            circ(cx + 14f, cy - 4f, 4f, OUT)
+            circ(cx + 31f, cy - 4f, 4f, OUT)
+            line(cx + 4f, cy - 16f, cx + 18f, cy - 13f, 4f, OUT)
+            line(cx + 22f, cy - 13f, cx + 35f, cy - 16f, 4f, OUT)
+        }
+
+        // Mouth (Shouting on attack or expressive grin)
+        if (mouth || dead) {
+            p.style = Paint.Style.FILL; p.color = 0xFF8B0000.toInt()
+            c.drawOval(cx + 8f, cy + 16f, cx + 28f, cy + 30f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+            c.drawOval(cx + 8f, cy + 16f, cx + 28f, cy + 30f, p)
+        } else if (hero.id != 0 && hero.id != 1 && hero.id != 8 && hero.id != 10) {
+            val pa = Path().apply {
+                moveTo(cx + 8f, cy + 20f)
+                quadTo(cx + 20f, cy + 30f, cx + 30f, cy + 20f)
+            }
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+            c.drawPath(pa, p)
+        }
     }
 }

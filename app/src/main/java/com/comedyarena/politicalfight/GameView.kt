@@ -188,10 +188,6 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         // Special attack always 100% full & ready
         p1.meter = 100f
         p2.meter = 100f
-
-        // Assign caricature head avatars to fighters
-        p1.headBmp = getAvatar(p1.hero.drawableName + "_head") ?: getAvatar(p1.hero.drawableName)
-        p2.headBmp = getAvatar(p2.hero.drawableName + "_head") ?: getAvatar(p2.hero.drawableName)
     }
 
     private fun buildControls() {

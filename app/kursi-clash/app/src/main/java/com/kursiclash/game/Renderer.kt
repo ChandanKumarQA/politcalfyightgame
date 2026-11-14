@@ -327,14 +327,8 @@ class Renderer(private val ctx: Context, private val g: Game) {
         arm(c, lean - 10f, shY + 10f, lean - 20f, shY + 40f, look)
         arm(c, lean + 10f, shY + 10f, lean + 30f + armExt, if (m == Moves.UPPER) shY - 40f else shY + 20f, look)
 
-        // Head (Caricature Bitmap if available or vector)
-        val headBmp = getBmp(f.def.iconRes + "_head") ?: getBmp(f.def.iconRes)
-        if (headBmp != null) {
-            val headDst = RectF(lean - 26f, shY - 65f, lean + 38f, shY - 5f)
-            c.drawBitmap(headBmp, null, headDst, p)
-        } else {
-            drawHead(c, look, lean + 6f, shY - 30f, 27f, if (f.st == St.HIT) 1 else 0)
-        }
+        // Cartoon Caricature Head
+        drawHead(c, look, lean + 6f, shY - 30f, 27f, if (f.st == St.HIT) 1 else 0)
 
         if (atk && m == Moves.SUPER && f.moveT > 8) {
             p.color = 0x88FF9F1C.toInt()

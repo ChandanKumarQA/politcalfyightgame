@@ -1,5 +1,6 @@
 package com.comedyarena.politicalfight
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -17,7 +18,7 @@ enum class S { IDLE, WALK, JUMP, PUNCH, KICK, SPECIAL, BLOCK, HIT, WIN, KO }
 class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float = 0.5f, hpMul: Float = 1f) {
     val maxHp = 100f * hpMul
     var hp = maxHp
-    var meter = 0f
+    var meter = 100f // Always fully charged / enabled for Special moves
     var y = K.GROUND
     var vx = 0f
     var vy = 0f
@@ -31,6 +32,8 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
     var anim = 0f
     var bubble = ""
     var bubbleT = 0
+    var stageW = 1600f
+    var headBmp: Bitmap? = null
     val held = BooleanArray(7)
     private var aiTimer = 0
     private var aiPlan = 0
@@ -114,6 +117,12 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         anim += 0.25f
         if (bubbleT > 0) bubbleT--
         if (state == S.KO || state == S.WIN) { vx *= 0.9f; physics(); return }
+
+        // Special mode is ALWAYS enabled and can be activated at any time!
+        if (held[5] && state != S.SPECIAL) {
+            startAtk(S.SPECIAL)
+        }
+
         if (stun > 0) {
             stun--; vx *= 0.9f
             if (stun == 0 && state == S.HIT) state = S.IDLE
@@ -146,7 +155,7 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         x += vx
         if (y < K.GROUND || vy < 0f) { vy += 1f; y += vy }
         if (y >= K.GROUND) { y = K.GROUND; vy = 0f }
-        x = x.coerceIn(60f, K.W - 60f)
+        x = x.coerceIn(60f, stageW - 60f)
     }
 
     private fun ext(a: Int, b: Int, d: Int): Float =
@@ -242,67 +251,76 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         p.style = Paint.Style.FILL; p.color = 0x55FFFFFF; c.drawRect(-36f, -138f + bob, 36f, -124f + bob, p)
         // head
         val cx = 4f; val cy = -212f + bob
-        circ(cx, cy, 38f, hero.skin)
-        circ(cx + 36f, cy + 8f, 7f, hero.skin)
-        if (dead) {
-            line(cx + 2f, cy - 10f, cx + 16f, cy + 4f, 4f, OUT); line(cx + 16f, cy - 10f, cx + 2f, cy + 4f, 4f, OUT)
-            line(cx + 20f, cy - 10f, cx + 34f, cy + 4f, 4f, OUT); line(cx + 34f, cy - 10f, cx + 20f, cy + 4f, 4f, OUT)
+        val hb = headBmp
+        if (hb != null) {
+            val hw = 96f; val hh = 104f
+            val dst = RectF(cx - hw / 2f + 4f, cy - hh / 2f - 4f, cx + hw / 2f + 4f, cy + hh / 2f - 4f)
+            c.drawBitmap(hb, null, dst, p)
+            if (dead) {
+                p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = 0xFFFFD700.toInt()
+                c.drawCircle(cx + 4f, cy - 35f, 18f, p)
+            }
         } else {
-            circ(cx + 10f, cy - 4f, 9f, 0xFFFFFFFF.toInt()); circ(cx + 28f, cy - 4f, 8f, 0xFFFFFFFF.toInt())
-            circ(cx + 13f, cy - 4f, 4f, OUT); circ(cx + 31f, cy - 4f, 4f, OUT)
-            line(cx + 2f, cy - 18f, cx + 18f, cy - 14f, 4f, OUT); line(cx + 22f, cy - 14f, cx + 36f, cy - 18f, 4f, OUT)
-        }
-        if (mouth || dead) {
-            p.style = Paint.Style.FILL; p.color = 0xFF8B0000.toInt(); c.drawOval(cx + 6f, cy + 14f, cx + 30f, cy + 32f, p)
-        } else {
-            val pa = Path(); pa.moveTo(cx + 6f, cy + 18f); pa.quadTo(cx + 18f, cy + 32f, cx + 30f, cy + 18f)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(pa, p)
-        }
-        // hats / hair / accessories
-        when (hero.hat) {
-            0 -> { rr(cx - 34f, cy - 52f, cx + 34f, cy - 30f, 10f, 0xFFFFFFFF.toInt()); rr(cx - 34f, cy - 34f, cx + 34f, cy - 27f, 3f, 0xFFBDBDBD.toInt()) }
-            1 -> { circ(cx, cy - 40f, 18f, 0xFF3E2723.toInt()); circ(cx - 22f, cy - 32f, 13f, 0xFF3E2723.toInt()); circ(cx + 20f, cy - 38f, 12f, 0xFF3E2723.toInt()) }
-            2 -> { rr(cx + 2f, cy + 6f, cx + 46f, cy + 16f, 5f, 0xFF3E2723.toInt()); rr(cx - 30f, cy - 44f, cx + 24f, cy - 32f, 6f, 0xFF616161.toInt()) }
-            3 -> {
-                rr(cx - 36f, cy - 46f, cx + 30f, cy - 28f, 12f, 0xFF9E9E9E.toInt())
-                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
-                c.drawCircle(cx + 10f, cy - 4f, 14f, p); c.drawCircle(cx + 28f, cy - 4f, 13f, p); c.drawLine(cx + 24f, cy - 4f, cx + 14f, cy - 4f, p)
+            circ(cx, cy, 38f, hero.skin)
+            circ(cx + 36f, cy + 8f, 7f, hero.skin)
+            if (dead) {
+                line(cx + 2f, cy - 10f, cx + 16f, cy + 4f, 4f, OUT); line(cx + 16f, cy - 10f, cx + 2f, cy + 4f, 4f, OUT)
+                line(cx + 20f, cy - 10f, cx + 34f, cy + 4f, 4f, OUT); line(cx + 34f, cy - 10f, cx + 20f, cy + 4f, 4f, OUT)
+            } else {
+                circ(cx + 10f, cy - 4f, 9f, 0xFFFFFFFF.toInt()); circ(cx + 28f, cy - 4f, 8f, 0xFFFFFFFF.toInt())
+                circ(cx + 13f, cy - 4f, 4f, OUT); circ(cx + 31f, cy - 4f, 4f, OUT)
+                line(cx + 2f, cy - 18f, cx + 18f, cy - 14f, 4f, OUT); line(cx + 22f, cy - 14f, cx + 36f, cy - 18f, 4f, OUT)
             }
-            4 -> {
-                p.style = Paint.Style.FILL; p.color = 0xFFFF7043.toInt(); c.drawOval(cx - 42f, cy - 62f, cx + 42f, cy - 20f, p)
-                p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawOval(cx - 42f, cy - 62f, cx + 42f, cy - 20f, p)
-                line(cx - 30f, cy - 30f, cx + 30f, cy - 52f, 4f, OUT); line(cx - 30f, cy - 42f, cx + 24f, cy - 58f, 4f, OUT)
-                circ(cx + 18f, cy - 40f, 6f, 0xFFFFEB3B.toInt())
+            if (mouth || dead) {
+                p.style = Paint.Style.FILL; p.color = 0xFF8B0000.toInt(); c.drawOval(cx + 6f, cy + 14f, cx + 30f, cy + 32f, p)
+            } else {
+                val pa = Path(); pa.moveTo(cx + 6f, cy + 18f); pa.quadTo(cx + 18f, cy + 32f, cx + 30f, cy + 18f)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(pa, p)
             }
-            5 -> { rr(cx - 38f, cy - 46f, cx + 34f, cy - 20f, 18f, 0xFF212121.toInt()); circ(cx - 24f, cy - 58f, 16f, 0xFF212121.toInt()); circ(cx + 26f, cy - 22f, 5f, 0xFFD50000.toInt()) }
-            6 -> {
-                val cr = Path(); cr.moveTo(cx - 30f, cy - 34f); cr.lineTo(cx - 30f, cy - 64f); cr.lineTo(cx - 15f, cy - 46f)
-                cr.lineTo(cx, cy - 70f); cr.lineTo(cx + 15f, cy - 46f); cr.lineTo(cx + 30f, cy - 64f); cr.lineTo(cx + 30f, cy - 34f); cr.close()
-                p.style = Paint.Style.FILL; p.color = 0xFFFFD600.toInt(); c.drawPath(cr, p)
-                p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawPath(cr, p)
-            }
-            7 -> {
-                rr(cx - 30f, cy - 70f, cx + 30f, cy - 36f, 14f, 0xFFFFEE58.toInt())
-                p.style = Paint.Style.FILL; p.color = 0xFFFFEE58.toInt(); c.drawOval(cx - 62f, cy - 46f, cx + 62f, cy - 28f, p)
-                p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawOval(cx - 62f, cy - 46f, cx + 62f, cy - 28f, p)
-                p.style = Paint.Style.FILL; p.color = 0xFFE53935.toInt(); c.drawRect(cx - 30f, cy - 50f, cx + 30f, cy - 44f, p)
-            }
-            8 -> {
-                // Cyber headphones & modern hair
-                circ(cx, cy - 38f, 20f, 0xFF212121.toInt())
-                p.style = Paint.Style.STROKE; p.strokeWidth = 6f; p.color = 0xFF00E5FF.toInt()
-                c.drawArc(RectF(cx - 36f, cy - 50f, cx + 36f, cy - 10f), 180f, 180f, false, p)
-                circ(cx - 36f, cy - 26f, 9f, 0xFF00E5FF.toInt())
-                circ(cx + 36f, cy - 26f, 9f, 0xFF00E5FF.toInt())
-            }
-            9 -> {
-                // Royal Golden Turban with ruby
-                val turb = Path()
-                turb.moveTo(cx - 38f, cy - 32f); turb.quadTo(cx, cy - 75f, cx + 38f, cy - 32f)
-                turb.lineTo(cx + 34f, cy - 22f); turb.lineTo(cx - 34f, cy - 22f); turb.close()
-                p.style = Paint.Style.FILL; p.color = 0xFFFFD700.toInt(); c.drawPath(turb, p)
-                p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawPath(turb, p)
-                circ(cx, cy - 44f, 8f, 0xFFD50000.toInt()) // Ruby
+            // hats / hair / accessories
+            when (hero.hat) {
+                0 -> { rr(cx - 34f, cy - 52f, cx + 34f, cy - 30f, 10f, 0xFFFFFFFF.toInt()); rr(cx - 34f, cy - 34f, cx + 34f, cy - 27f, 3f, 0xFFBDBDBD.toInt()) }
+                1 -> { circ(cx, cy - 40f, 18f, 0xFF3E2723.toInt()); circ(cx - 22f, cy - 32f, 13f, 0xFF3E2723.toInt()); circ(cx + 20f, cy - 38f, 12f, 0xFF3E2723.toInt()) }
+                2 -> { rr(cx + 2f, cy + 6f, cx + 46f, cy + 16f, 5f, 0xFF3E2723.toInt()); rr(cx - 30f, cy - 44f, cx + 24f, cy - 32f, 6f, 0xFF616161.toInt()) }
+                3 -> {
+                    rr(cx - 36f, cy - 46f, cx + 30f, cy - 28f, 12f, 0xFF9E9E9E.toInt())
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
+                    c.drawCircle(cx + 10f, cy - 4f, 14f, p); c.drawCircle(cx + 28f, cy - 4f, 13f, p); c.drawLine(cx + 24f, cy - 4f, cx + 14f, cy - 4f, p)
+                }
+                4 -> {
+                    p.style = Paint.Style.FILL; p.color = 0xFFFF7043.toInt(); c.drawOval(cx - 42f, cy - 62f, cx + 42f, cy - 20f, p)
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawOval(cx - 42f, cy - 62f, cx + 42f, cy - 20f, p)
+                    line(cx - 30f, cy - 30f, cx + 30f, cy - 52f, 4f, OUT); line(cx - 30f, cy - 42f, cx + 24f, cy - 58f, 4f, OUT)
+                    circ(cx + 18f, cy - 40f, 6f, 0xFFFFEB3B.toInt())
+                }
+                5 -> { rr(cx - 38f, cy - 46f, cx + 34f, cy - 20f, 18f, 0xFF212121.toInt()); circ(cx - 24f, cy - 58f, 16f, 0xFF212121.toInt()); circ(cx + 26f, cy - 22f, 5f, 0xFFD50000.toInt()) }
+                6 -> {
+                    val cr = Path(); cr.moveTo(cx - 30f, cy - 34f); cr.lineTo(cx - 30f, cy - 64f); cr.lineTo(cx - 15f, cy - 46f)
+                    cr.lineTo(cx, cy - 70f); cr.lineTo(cx + 15f, cy - 46f); cr.lineTo(cx + 30f, cy - 64f); cr.lineTo(cx + 30f, cy - 34f); cr.close()
+                    p.style = Paint.Style.FILL; p.color = 0xFFFFD600.toInt(); c.drawPath(cr, p)
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawPath(cr, p)
+                }
+                7 -> {
+                    rr(cx - 30f, cy - 70f, cx + 30f, cy - 36f, 14f, 0xFFFFEE58.toInt())
+                    p.style = Paint.Style.FILL; p.color = 0xFFFFEE58.toInt(); c.drawOval(cx - 62f, cy - 46f, cx + 62f, cy - 28f, p)
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawOval(cx - 62f, cy - 46f, cx + 62f, cy - 28f, p)
+                    p.style = Paint.Style.FILL; p.color = 0xFFE53935.toInt(); c.drawRect(cx - 30f, cy - 50f, cx + 30f, cy - 44f, p)
+                }
+                8 -> {
+                    circ(cx, cy - 38f, 20f, 0xFF212121.toInt())
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 6f; p.color = 0xFF00E5FF.toInt()
+                    c.drawArc(RectF(cx - 36f, cy - 50f, cx + 36f, cy - 10f), 180f, 180f, false, p)
+                    circ(cx - 36f, cy - 26f, 9f, 0xFF00E5FF.toInt())
+                    circ(cx + 36f, cy - 26f, 9f, 0xFF00E5FF.toInt())
+                }
+                9 -> {
+                    val turb = Path()
+                    turb.moveTo(cx - 38f, cy - 32f); turb.quadTo(cx, cy - 75f, cx + 38f, cy - 32f)
+                    turb.lineTo(cx + 34f, cy - 22f); turb.lineTo(cx - 34f, cy - 22f); turb.close()
+                    p.style = Paint.Style.FILL; p.color = 0xFFFFD700.toInt(); c.drawPath(turb, p)
+                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawPath(turb, p)
+                    circ(cx, cy - 44f, 8f, 0xFFD50000.toInt())
+                }
             }
         }
         // front arm

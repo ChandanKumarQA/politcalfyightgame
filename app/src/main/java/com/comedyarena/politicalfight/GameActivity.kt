@@ -20,7 +20,10 @@ class GameActivity : Activity() {
         }
         val cfg = Cfg(
             intent.getStringExtra("mode") ?: "quick",
-            intent.getIntExtra("p1", 0), intent.getIntExtra("p2", 1), intent.getIntExtra("level", 1)
+            intent.getIntExtra("p1", 0),
+            intent.getIntExtra("p2", 1),
+            intent.getIntExtra("level", 1),
+            intent.getIntExtra("arena", 0)
         )
         AdManager.loadInterstitial(this)
         gv = GameView(this, cfg) {

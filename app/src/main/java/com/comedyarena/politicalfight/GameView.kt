@@ -1,6 +1,8 @@
 package com.comedyarena.politicalfight
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -17,7 +19,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** mode: story | quick | party | tourney | two */
-class Cfg(val mode: String, val p1: Int, val p2: Int, val level: Int)
+class Cfg(val mode: String, val p1: Int, val p2: Int, val level: Int, val arena: Int = 0)
 
 private class Proj(var x: Float, var y: Float, val vx: Float, val owner: Fighter, val dmg: Float,
                    val r: Float, val label: String, val col: Int, val wob: Boolean) { var age = 0 }
@@ -28,8 +30,8 @@ private class OB(val r: RectF, val label: String, val col: Int, val act: () -> U
 class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Unit) :
     SurfaceView(ctx), SurfaceHolder.Callback, Runnable {
 
-    private val W = K.W
-    private val H = K.H
+    private var W = 1600f
+    private val H = 900f
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     @Volatile private var running = false
     private var thread: Thread? = null
@@ -70,69 +72,93 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
     private var endButtons = listOf<OB>()
     private var pauseButtons = listOf<OB>()
     @Volatile private var pending: (() -> Unit)? = null
-    private val pauseRect = RectF(750f, 150f, 850f, 205f)
+    private var pauseRect = RectF(760f, 130f, 840f, 180f)
+
+    private val avatarCache = HashMap<String, Bitmap>()
+    private fun getAvatar(name: String): Bitmap? {
+        return avatarCache.getOrPut(name) {
+            try {
+                val resId = context.resources.getIdentifier(name, "drawable", context.packageName)
+                if (resId != 0) BitmapFactory.decodeResource(context.resources, resId) else null
+            } catch (e: Exception) { null }
+        }
+    }
 
     init {
         holder.addCallback(this)
         isFocusable = true
-        buildControls()
-        pauseButtons = listOf(
-            OB(RectF(560f, 380f, 1040f, 470f), "RESUME", 0xFF43A047.toInt()) { paused = false },
-            OB(RectF(560f, 500f, 1040f, 590f), "MAIN MENU", 0xFFE53935.toInt()) { exitNow() })
         initTournament()
         setupMatch()
+        buildControls()
+        updatePauseButtons()
+    }
+
+    private fun updatePauseButtons() {
+        val midX = W / 2f
+        pauseButtons = listOf(
+            OB(RectF(midX - 240f, 380f, midX + 240f, 470f), "RESUME", 0xFF43A047.toInt()) { paused = false },
+            OB(RectF(midX - 240f, 500f, midX + 240f, 590f), "MAIN MENU", 0xFFE53935.toInt()) { exitNow() })
     }
 
     private fun exitNow() { post { onExit() } }
 
     // ---------------------------------------------------------------- setup
     private fun initTournament() {
-        val pool = (0 until 8).filter { it != cfg.p1 }.shuffled(rnd)
-        tOpps = IntArray(4) { pool[it] }
+        val pool = (0 until heroes.size).filter { it != cfg.p1 }.shuffled(rnd)
+        tOpps = IntArray(4) { pool[it % pool.size] }
     }
 
     private fun setupMatch() {
         projs.clear(); floats.clear()
         phase = 0; phaseT = 0; timeLeft = 3600; shake = 0f; paused = false; endButtons = listOf()
         val h1 = heroes[cfg.p1]
+        arena = cfg.arena.coerceIn(0, 2)
+
         when (cfg.mode) {
             "story" -> {
-                val lv = Levels.list[curLevel - 1]
-                var o = if (lv.opp < 0) (cfg.p1 + 2 + rnd.nextInt(5)) % 8 else lv.opp
-                if (o == cfg.p1) o = (o + 1) % 8
+                val lv = Levels.getLevel(curLevel)
+                var o = if (lv.opp < 0) (cfg.p1 + 2 + rnd.nextInt(5)) % heroes.size else lv.opp
+                if (o == cfg.p1) o = (o + 1) % heroes.size
                 arena = lv.arena
                 p1 = Fighter(h1, 380f, false)
-                p2 = Fighter(heroes[o], 1220f, true, lv.diff, lv.hpMul)
+                p2 = Fighter(heroes[o], W - 380f, true, lv.diff, lv.hpMul)
                 banner = "LEVEL $curLevel: ${lv.title.uppercase()}"
             }
             "tourney" -> {
                 val o = tOpps[tRound]
-                arena = (tRound * 2 + 1) % 7
+                arena = (tRound * 2 + 1) % 3
                 p1 = Fighter(h1, 380f, false)
-                p2 = Fighter(heroes[o], 1220f, true, 0.35f + 0.17f * tRound, 1f + 0.1f * tRound)
+                p2 = Fighter(heroes[o], W - 380f, true, 0.35f + 0.17f * tRound, 1f + 0.1f * tRound)
                 banner = "TOURNAMENT ROUND ${tRound + 1}/4"
             }
             "party" -> {
-                arena = rnd.nextInt(7)
                 p1 = Fighter(h1, 380f, false)
-                p2 = Fighter(heroes[cfg.p2], 1220f, true, 0.55f, 1f)
+                p2 = Fighter(heroes[cfg.p2], W - 380f, true, 0.55f, 1f)
                 banner = "${h1.party.uppercase()} VS ${heroes[cfg.p2].party.uppercase()}"
             }
             "two" -> {
-                arena = rnd.nextInt(7)
                 p1 = Fighter(h1, 380f, false)
-                p2 = Fighter(heroes[cfg.p2], 1220f, false)
+                p2 = Fighter(heroes[cfg.p2], W - 380f, false)
                 banner = "TWO PLAYER BATTLE"
             }
             else -> {
-                var o = rnd.nextInt(8); if (o == cfg.p1) o = (o + 1) % 8
-                arena = rnd.nextInt(7)
+                var o = rnd.nextInt(heroes.size); if (o == cfg.p1) o = (o + 1) % heroes.size
                 p1 = Fighter(h1, 380f, false)
-                p2 = Fighter(heroes[o], 1220f, true, 0.5f, 1f)
+                p2 = Fighter(heroes[o], W - 380f, true, 0.5f, 1f)
                 banner = "QUICK FIGHT"
             }
         }
         p2.face = -1
+        p1.stageW = W
+        p2.stageW = W
+
+        // Special attack always 100% full & ready
+        p1.meter = 100f
+        p2.meter = 100f
+
+        // Assign caricature head avatars to fighters
+        p1.headBmp = getAvatar(p1.hero.drawableName + "_head") ?: getAvatar(p1.hero.drawableName)
+        p2.headBmp = getAvatar(p2.hero.drawableName + "_head") ?: getAvatar(p2.hero.drawableName)
     }
 
     private fun buildControls() {
@@ -140,14 +166,24 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         fun add(pl: Int, code: Int, label: String, x: Float, y: Float, s: Float, col: Int) {
             btns.add(Btn(RectF(x, y, x + s, y + s), label, pl, code, col))
         }
+        val midX = W / 2f
+        pauseRect = RectF(midX - 45f, 125f, midX + 45f, 175f)
+
         if (cfg.mode != "two") {
-            val s = 150f
-            add(0, 0, "◀", 30f, 720f, s, 0xFF42A5F5.toInt()); add(0, 1, "▶", 200f, 720f, s, 0xFF42A5F5.toInt())
-            add(0, 2, "JUMP", 115f, 550f, s, 0xFF66BB6A.toInt())
-            add(0, 6, "BLOCK", 1060f, 720f, s, 0xFF78909C.toInt()); add(0, 3, "PUNCH", 1250f, 720f, s, 0xFFEF5350.toInt())
-            add(0, 4, "KICK", 1420f, 720f, s, 0xFFFFA726.toInt()); add(0, 5, "SPECIAL", 1335f, 500f, s, 0xFFAB47BC.toInt())
+            val s = 145f
+            // Left Thumb (Movement & Jump)
+            add(0, 0, "◀", 35f, 715f, s, 0xFF42A5F5.toInt())
+            add(0, 1, "▶", 205f, 715f, s, 0xFF42A5F5.toInt())
+            add(0, 2, "JUMP", 120f, 545f, s, 0xFF66BB6A.toInt())
+
+            // Right Thumb (Combat Buttons)
+            add(0, 6, "BLOCK", W - 530f, 715f, s, 0xFF78909C.toInt())
+            add(0, 3, "PUNCH", W - 365f, 715f, s, 0xFFEF5350.toInt())
+            add(0, 4, "KICK", W - 200f, 715f, s, 0xFFFFA726.toInt())
+            // SPECIAL button placed prominently above Punch/Kick
+            add(0, 5, "SPECIAL", W - 280f, 500f, 160f, 0xFFAB47BC.toInt())
         } else {
-            val s = 112f; val st = 122f
+            val s = 110f; val st = 120f
             for (pl in 0..1) {
                 val bx = if (pl == 0) 24f else W - 24f - (3 * st + s)
                 val y1 = H - s - 16f; val y2 = y1 - st
@@ -162,7 +198,16 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
     // ---------------------------------------------------------------- lifecycle
     override fun surfaceCreated(h: SurfaceHolder) { running = true; thread = Thread(this).also { it.start() } }
     override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, hh: Int) {
-        sc = max(w / W, hh / H); ox = (w - W * sc) / 2f; oy = (hh - H * sc) / 2f
+        if (hh > 0 && w > 0) {
+            sc = hh / 900f
+            W = max(1600f, w / sc)
+            ox = 0f
+            oy = 0f
+            if (::p1.isInitialized) p1.stageW = W
+            if (::p2.isInitialized) p2.stageW = W
+            buildControls()
+            updatePauseButtons()
+        }
     }
     override fun surfaceDestroyed(h: SurfaceHolder) {
         running = false
@@ -224,6 +269,7 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         System.arraycopy(held[0], 0, p1.held, 0, 7)
         if (cfg.mode == "two") System.arraycopy(held[1], 0, p2.held, 0, 7) else p2.think(p1)
         p1.update(p2); p2.update(p1)
+
         // keep fighters from overlapping
         val dx = p2.x - p1.x
         if (abs(dx) < 70f && p1.onGround && p2.onGround) {
@@ -239,13 +285,10 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
 
     private fun spawnProj(f: Fighter) {
         val st = f.hero.id % 3
-        val sp = when (st) { 0 -> 13f; 1 -> 9f; else -> 16f }
-        val r = when (st) { 0 -> 38f; 1 -> 52f; else -> 30f }
-        // Meter boosts damage: 0.5x at empty → 1.5x at full meter
-        val meterBonus = 0.5f + (f.meter / 100f).coerceIn(0f, 1f)
-        val dmg = when (st) { 0 -> 20f; 1 -> 24f; else -> 16f } * f.dmgMul * meterBonus
-        // Consume whatever meter is available
-        f.meter = 0f
+        val sp = when (st) { 0 -> 14f; 1 -> 11f; else -> 17f }
+        val r = when (st) { 0 -> 42f; 1 -> 56f; else -> 35f }
+        val dmg = when (st) { 0 -> 22f; 1 -> 26f; else -> 18f } * f.dmgMul * 1.5f
+        f.meter = 100f // Keep Special mode permanently enabled
         projs.add(Proj(f.x + f.face * 70f, f.y - 140f, f.face * sp, f, dmg, r, f.hero.specialLabel, f.hero.specialColor, f.hero.id % 2 == 1))
         f.say(f.hero.shout, 70)
         Sfx.special()
@@ -271,8 +314,8 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         if (RectF.intersects(a.atkRect(), b.hurtRect())) {
             a.hitDone = true
             val kick = a.state == S.KICK
-            val dmg = (if (kick) 10f else 6f) * a.dmgMul
-            val kb = (if (kick) 11f else 6f) * (if (a.hero.ability == 1) 1.5f else 1f)
+            val dmg = (if (kick) 11f else 7f) * a.dmgMul
+            val kb = (if (kick) 12f else 7f) * (if (a.hero.ability == 1) 1.5f else 1f)
             val blocked = b.takeHit(dmg, kb, a.face, kick)
             onHit(a, b, dmg, blocked, if (kick) "WHAM!" else "BONK!")
             if (kick) Sfx.kick() else Sfx.punch()
@@ -286,7 +329,7 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
             Sfx.block()
         } else {
             if (a === p1) {
-                comboTimer = 55
+                comboTimer = 60
                 comboCount++
                 if (comboCount >= 2) {
                     floats.add(FT(b.x, b.y - 300f, "COMBO x$comboCount!", 46, 0xFFFF9800.toInt()))
@@ -296,7 +339,7 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
             val col = if (word == "KABOOM!") 0xFFFFD700.toInt() else 0xFFFFEB3B.toInt()
             floats.add(FT(b.x, b.y - 240f, hitWord, 40, col))
         }
-        a.meter = min(100f, a.meter + 8f * (if (a.hero.ability == 4) 1.6f else 1f))
+        a.meter = 100f // Keep Special fully enabled
         if (a.hero.ability == 2 && !blocked) a.hp = min(a.maxHp, a.hp + a.maxHp * 0.04f)
         if (a === p1 && !blocked) score += (dmg * 10f).toInt()
     }
@@ -318,27 +361,28 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         if (cfg.mode != "two") { if (humanWon) Sfx.win() else Sfx.lose() } else Sfx.win()
         if (humanWon) score += (timeLeft / 60) * 50 + (p1.hp * 5f).toInt()
         if (score > Prefs.best) Prefs.best = score
-        if (cfg.mode == "story" && humanWon) Prefs.unlocked = max(Prefs.unlocked, min(10, curLevel + 1))
+        if (cfg.mode == "story" && humanWon) Prefs.unlocked = max(Prefs.unlocked, min(500, curLevel + 1))
 
         resultTitle = when {
             isDraw -> "DRAW!"
             cfg.mode == "two" -> if (winnerP1) "PLAYER 1 WINS!" else "PLAYER 2 WINS!"
-            humanWon && cfg.mode == "story" && curLevel == 10 -> "CHAMPION OF THE ARENA!"
+            humanWon && cfg.mode == "story" && curLevel == 500 -> "THE ULTIMATE GRAND CHAMPION!"
             humanWon && cfg.mode == "tourney" && tRound == 3 -> "TOURNAMENT CHAMPION!"
             humanWon -> "YOU WIN!"
             else -> "YOU LOSE!"
         }
         val opts = ArrayList<Pair<String, () -> Unit>>()
         when (cfg.mode) {
-            "story" -> if (humanWon) { if (curLevel < 10) opts.add("NEXT LEVEL" to { curLevel++; setupMatch() }) }
+            "story" -> if (humanWon) { if (curLevel < 500) opts.add("NEXT LEVEL" to { curLevel++; setupMatch() }) }
             else opts.add("RETRY" to { setupMatch() })
             "tourney" -> if (humanWon) { if (tRound < 3) opts.add("NEXT ROUND" to { tRound++; setupMatch() }) }
             else opts.add("RESTART TOURNAMENT" to { tRound = 0; score = 0; initTournament(); setupMatch() })
             else -> opts.add("REMATCH" to { setupMatch() })
         }
         opts.add("MAIN MENU" to { exitNow() })
+        val midX = W / 2f
         endButtons = opts.mapIndexed { i, o ->
-            OB(RectF(560f, 560f + i * 105f, 1040f, 650f + i * 105f), o.first, if (i == 0) 0xFF43A047.toInt() else 0xFFE53935.toInt(), o.second)
+            OB(RectF(midX - 240f, 560f + i * 105f, midX + 240f, 650f + i * 105f), o.first, if (i == 0) 0xFF43A047.toInt() else 0xFFE53935.toInt(), o.second)
         }
     }
 
@@ -367,7 +411,11 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
             for (i in 0 until e.pointerCount) {
                 if (a == MotionEvent.ACTION_POINTER_UP && i == e.actionIndex) continue
                 val (x, y) = toWorld(e.getX(i), e.getY(i))
-                for (b in btns) if (b.r.contains(x, y)) held[b.player][b.code] = true
+                for (b in btns) {
+                    val pad = if (b.code == 5) 24f else 8f
+                    val hit = RectF(b.r.left - pad, b.r.top - pad, b.r.right + pad, b.r.bottom + pad)
+                    if (hit.contains(x, y)) held[b.player][b.code] = true
+                }
             }
         }
         return true
@@ -381,7 +429,7 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         c.clipRect(0f, 0f, W, H)
         c.save()
         if (shake > 0.5f) c.translate((rnd.nextFloat() - 0.5f) * shake * 2f, (rnd.nextFloat() - 0.5f) * shake * 2f)
-        Arenas.draw(c, paint, arena, tm)
+        Arenas.draw(c, paint, arena, tm, W)
         val (back, front) = if (p1.y >= p2.y) Pair(p2, p1) else Pair(p1, p2)
         back.draw(c, paint); front.draw(c, paint)
         for (p in projs) drawProj(c, p)
@@ -392,8 +440,8 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         drawControls(c)
         drawNewsdesk(c)
         if (phase == 0) {
-            drawOutlined(c, banner, W / 2, 260f, 52f, Color.WHITE)
-            drawOutlined(c, if (phaseT < 95) "GET READY!" else "FIGHT!", W / 2, 360f, 96f, if (phaseT < 95) 0xFFFFEB3B.toInt() else 0xFFFF5252.toInt())
+            drawOutlined(c, banner, W / 2f, 260f, 52f, Color.WHITE)
+            drawOutlined(c, if (phaseT < 95) "GET READY!" else "FIGHT!", W / 2f, 360f, 96f, if (phaseT < 95) 0xFFFFEB3B.toInt() else 0xFFFF5252.toInt())
         }
         if (phase == 2 && phaseT > 40) drawEnd(c)
         if (paused) drawPause(c)
@@ -451,60 +499,120 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
     }
 
     private fun bar(c: Canvas, x: Float, y: Float, w: Float, h: Float, frac: Float, col: Int, rightAlign: Boolean) {
-        paint.style = Paint.Style.FILL; paint.color = 0xFF37474F.toInt(); c.drawRoundRect(x, y, x + w, y + h, 14f, 14f, paint)
+        paint.style = Paint.Style.FILL; paint.color = 0xFF2B201A.toInt(); c.drawRoundRect(x, y, x + w, y + h, 10f, 10f, paint)
         val fw = w * frac.coerceIn(0f, 1f)
         paint.color = col
-        if (rightAlign) c.drawRoundRect(x + w - fw, y, x + w, y + h, 14f, 14f, paint) else c.drawRoundRect(x, y, x + fw, y + h, 14f, 14f, paint)
-        paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f; paint.color = 0xFF111111.toInt(); c.drawRoundRect(x, y, x + w, y + h, 14f, 14f, paint)
+        if (rightAlign) c.drawRoundRect(x + w - fw, y, x + w, y + h, 10f, 10f, paint) else c.drawRoundRect(x, y, x + fw, y + h, 10f, 10f, paint)
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f; paint.color = 0xFF111111.toInt(); c.drawRoundRect(x, y, x + w, y + h, 10f, 10f, paint)
     }
 
-    private fun hpColor(f: Float) = if (f > 0.5f) 0xFF66BB6A.toInt() else if (f > 0.25f) 0xFFFFCA28.toInt() else 0xFFEF5350.toInt()
+    private fun hpColor(f: Float) = if (f > 0.5f) 0xFFFFB300.toInt() else if (f > 0.25f) 0xFFFF9800.toInt() else 0xFFEF5350.toInt()
 
     private fun drawHud(c: Canvas) {
         val f1 = p1.hp / p1.maxHp; val f2 = p2.hp / p2.maxHp
-        bar(c, 40f, 40f, 620f, 46f, f1, hpColor(f1), false)
-        bar(c, 940f, 40f, 620f, 46f, f2, hpColor(f2), true)
+        val b1 = p1.headBmp
+        val b2 = p2.headBmp
+
+        // --- P1 Avatar Portrait Box (Left) ---
+        val r1 = RectF(30f, 28f, 122f, 120f)
+        paint.style = Paint.Style.FILL; paint.color = 0xFF201612.toInt(); c.drawRoundRect(r1, 14f, 14f, paint)
+        if (b1 != null) {
+            c.drawBitmap(b1, null, RectF(34f, 32f, 118f, 116f), paint)
+        }
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f; paint.color = 0xFFFF9800.toInt()
+        c.drawRoundRect(r1, 14f, 14f, paint)
+        // 1P Badge
+        paint.style = Paint.Style.FILL; paint.color = 0xFFE65100.toInt()
+        c.drawRoundRect(RectF(26f, 22f, 64f, 44f), 6f, 6f, paint)
+        paint.color = Color.WHITE; paint.textSize = 14f; paint.typeface = Typeface.DEFAULT_BOLD; paint.textAlign = Paint.Align.CENTER
+        c.drawText(if (cfg.mode == "two") "1P" else "YOU", 45f, 38f, paint)
+
+        // --- P2 Avatar Portrait Box (Right) ---
+        val r2 = RectF(W - 122f, 28f, W - 30f, 120f)
+        paint.style = Paint.Style.FILL; paint.color = 0xFF201612.toInt(); c.drawRoundRect(r2, 14f, 14f, paint)
+        if (b2 != null) {
+            c.drawBitmap(b2, null, RectF(W - 118f, 32f, W - 34f, 116f), paint)
+        }
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f; paint.color = 0xFF03A9F4.toInt()
+        c.drawRoundRect(r2, 14f, 14f, paint)
+        // CPU/2P Badge
+        paint.style = Paint.Style.FILL; paint.color = 0xFF0288D1.toInt()
+        c.drawRoundRect(RectF(W - 64f, 22f, W - 26f, 44f), 6f, 6f, paint)
+        paint.color = Color.WHITE; paint.textSize = 14f; paint.typeface = Typeface.DEFAULT_BOLD; paint.textAlign = Paint.Align.CENTER
+        c.drawText(if (cfg.mode == "two") "2P" else "CPU", W - 45f, 38f, paint)
+
+        // --- Health Bars ---
+        val barW = min(540f, W / 2f - 240f)
+        bar(c, 134f, 34f, barW, 40f, f1, hpColor(f1), false)
+        bar(c, W - 134f - barW, 34f, barW, 40f, f2, hpColor(f2), true)
+
+        // --- Round Win Circles ---
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f; paint.color = 0xFFFFD700.toInt()
+        c.drawCircle(146f, 84f, 6f, paint); c.drawCircle(164f, 84f, 6f, paint)
+        c.drawCircle(W - 146f, 84f, 6f, paint); c.drawCircle(W - 164f, 84f, 6f, paint)
+
+        // --- Fighter Names ---
+        paint.style = Paint.Style.FILL; paint.textSize = 22f; paint.typeface = Typeface.DEFAULT_BOLD
+        paint.textAlign = Paint.Align.LEFT; paint.color = 0xFFFFEB3B.toInt()
+        c.drawText("${p1.hero.name} (YOU)", 182f, 88f, paint)
+        paint.textAlign = Paint.Align.RIGHT; paint.color = 0xFF81D4FA.toInt()
+        c.drawText("${p2.hero.name} (${if (cfg.mode == "two") "P2" else "CPU"})", W - 182f, 88f, paint)
+
+        // --- SHAKTI Meter Bars ---
+        val meterW = min(360f, barW - 60f)
         val m1 = p1.meter / 100f; val m2 = p2.meter / 100f
-        // SHAKTI meter bars - always visible, glow when full
-        bar(c, 40f, 94f, 420f, 24f, m1, if (m1 >= 1f && (tm.toInt() / 6) % 2 == 0) 0xFFFFFFFF.toInt() else 0xFFFFD600.toInt(), false)
-        bar(c, 1140f, 94f, 420f, 24f, m2, if (m2 >= 1f && (tm.toInt() / 6) % 2 == 0) 0xFFFFFFFF.toInt() else 0xFFFFD600.toInt(), true)
-        // SHAKTI labels
-        paint.textSize = 18f; paint.typeface = Typeface.DEFAULT_BOLD; paint.style = Paint.Style.FILL
-        paint.setShadowLayer(3f, 0f, 0f, Color.BLACK)
-        paint.textAlign = Paint.Align.LEFT; paint.color = 0xFFFFD600.toInt()
-        c.drawText("SHAKTI", 44f, 108f, paint)
+        bar(c, 134f, 98f, meterW, 20f, m1, 0xFFFFD700.toInt(), false)
+        bar(c, W - 134f - meterW, 98f, meterW, 20f, m2, 0xFFFFD700.toInt(), true)
+
+        // --- SHAKTI Labels & Special Ready Glow ---
+        paint.textSize = 15f; paint.textAlign = Paint.Align.LEFT; paint.color = 0xFFFFD600.toInt()
+        c.drawText("SHAKTI", 138f, 114f, paint)
         paint.textAlign = Paint.Align.RIGHT
-        c.drawText("SHAKTI", 1556f, 108f, paint)
-        paint.textSize = 28f; paint.color = Color.WHITE
-        paint.textAlign = Paint.Align.LEFT
-        c.drawText((if (cfg.mode == "two") "P1 · " else "") + p1.hero.name + " (" + p1.hero.party + ")", 44f, 150f, paint)
-        paint.textAlign = Paint.Align.RIGHT
-        c.drawText((if (cfg.mode == "two") "P2 · " else "") + p2.hero.name + " (" + p2.hero.party + ")", 1556f, 150f, paint)
-        // Show power level hint instead of "SPECIAL READY"
-        if (m1 >= 1f) { paint.textAlign = Paint.Align.LEFT; paint.color = 0xFFFFEB3B.toInt(); c.drawText("MAX POWER! ${p1.hero.specialName}", 44f, 185f, paint) }
-        if (m2 >= 1f && cfg.mode == "two") { paint.textAlign = Paint.Align.RIGHT; paint.color = 0xFFFFEB3B.toInt(); c.drawText("MAX POWER! ${p2.hero.specialName}", 1556f, 185f, paint) }
-        paint.clearShadowLayer()
-        drawOutlined(c, ceil(timeLeft / 60f).toInt().toString(), W / 2, 100f, 70f, Color.WHITE)
-        if (cfg.mode != "two") drawOutlined(c, "SCORE $score", W / 2, 135f, 28f, 0xFFFFEB3B.toInt())
+        c.drawText("SHAKTI", W - 138f, 114f, paint)
+
+        // "SPECIAL READY" Always Glowing!
+        val glowCol = if ((tm.toInt() / 6) % 2 == 0) 0xFFFFEB3B.toInt() else 0xFFFF9800.toInt()
+        paint.textSize = 20f; paint.textAlign = Paint.Align.LEFT; paint.color = glowCol
+        c.drawText("★ SPECIAL READY: ${p1.hero.specialLabel} ★", 134f, 142f, paint)
+
+        if (cfg.mode == "two") {
+            paint.textAlign = Paint.Align.RIGHT
+            c.drawText("★ SPECIAL READY: ${p2.hero.specialLabel} ★", W - 134f, 142f, paint)
+        }
+
+        // --- Timer (Center) ---
+        val midX = W / 2f
+        drawOutlined(c, ceil(timeLeft / 60f).toInt().toString(), midX, 86f, 66f, Color.WHITE)
+        if (cfg.mode != "two") drawOutlined(c, "SCORE $score", midX, 118f, 24f, 0xFFFFEB3B.toInt())
+
+        // Pause Button
         if (phase == 1) {
-            paint.style = Paint.Style.FILL; paint.color = 0x88000000.toInt(); c.drawRoundRect(pauseRect, 14f, 14f, paint)
-            drawOutlined(c, "II", pauseRect.centerX(), pauseRect.centerY() + 12f, 34f, Color.WHITE)
+            paint.style = Paint.Style.FILL; paint.color = 0xAA000000.toInt(); c.drawRoundRect(pauseRect, 12f, 12f, paint)
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f; paint.color = 0xFFFFD700.toInt(); c.drawRoundRect(pauseRect, 12f, 12f, paint)
+            drawOutlined(c, "II", pauseRect.centerX(), pauseRect.centerY() + 11f, 30f, Color.WHITE)
         }
     }
 
     private fun drawControls(c: Canvas) {
         for (b in btns) {
             val pr = held[b.player][b.code]
-            // Special button glows when meter is full
             val isSpecial = b.code == 5
-            val alpha = if (pr) 0xE6 else if (isSpecial) 0xCC else 0x8C
-            val col = if (isSpecial && p1.meter >= 100f && (tm.toInt() / 4) % 2 == 0) 0xFFFFD600.toInt() else b.col
+            val alpha = if (pr) 0xF0 else if (isSpecial) 0xDD else 0x99
+
+            // SPECIAL button always glows gold and stands out
+            val col = if (isSpecial) {
+                if ((tm.toInt() / 6) % 2 == 0) 0xFFFFB300.toInt() else 0xFF9C27B0.toInt()
+            } else b.col
+
             paint.style = Paint.Style.FILL; paint.color = (col and 0x00FFFFFF) or (alpha shl 24)
-            c.drawRoundRect(b.r, 30f, 30f, paint)
-            val borderCol = if (isSpecial && p1.meter >= 100f) 0xFFFFEB3B.toInt() else 0xCCFFFFFF.toInt()
-            paint.style = Paint.Style.STROKE; paint.strokeWidth = if (isSpecial) 7f else 5f; paint.color = borderCol; c.drawRoundRect(b.r, 30f, 30f, paint)
+            c.drawRoundRect(b.r, 26f, 26f, paint)
+
+            val borderCol = if (isSpecial) 0xFFFFD700.toInt() else 0xCCFFFFFF.toInt()
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = if (isSpecial) 6f else 4f; paint.color = borderCol
+            c.drawRoundRect(b.r, 26f, 26f, paint)
+
             val s = b.r.width()
-            val size = if (b.label.length > 3) s * 0.2f else s * 0.4f
+            val size = if (b.label.length > 3) s * 0.22f else s * 0.42f
             drawOutlined(c, b.label, b.r.centerX(), b.r.centerY() + size / 3f, size, Color.WHITE)
         }
     }
@@ -546,17 +654,19 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
 
     private fun drawEnd(c: Canvas) {
         paint.style = Paint.Style.FILL; paint.color = 0xAA000000.toInt(); c.drawRect(0f, 0f, W, H, paint)
-        drawOutlined(c, resultTitle, W / 2, 300f, 100f, 0xFFFFEB3B.toInt())
+        drawOutlined(c, resultTitle, W / 2f, 300f, 96f, 0xFFFFEB3B.toInt())
         if (cfg.mode != "two") {
-            drawOutlined(c, "SCORE: $score     BEST: ${Prefs.best}", W / 2, 390f, 44f, Color.WHITE)
-            if (cfg.mode == "story" && winnerP1 && !isDraw && curLevel < 10) drawOutlined(c, "LEVEL ${curLevel + 1} UNLOCKED!", W / 2, 460f, 40f, 0xFF69F0AE.toInt())
+            drawOutlined(c, "SCORE: $score     BEST: ${Prefs.best}", W / 2f, 390f, 44f, Color.WHITE)
+            if (cfg.mode == "story" && winnerP1 && !isDraw && curLevel < 500) {
+                drawOutlined(c, "LEVEL ${curLevel + 1} UNLOCKED!", W / 2f, 460f, 40f, 0xFF69F0AE.toInt())
+            }
         }
         drawButtons(c, endButtons)
     }
 
     private fun drawPause(c: Canvas) {
         paint.style = Paint.Style.FILL; paint.color = 0xCC000000.toInt(); c.drawRect(0f, 0f, W, H, paint)
-        drawOutlined(c, "PAUSED", W / 2, 300f, 100f, Color.WHITE)
+        drawOutlined(c, "PAUSED", W / 2f, 300f, 96f, Color.WHITE)
         drawButtons(c, pauseButtons)
     }
 }

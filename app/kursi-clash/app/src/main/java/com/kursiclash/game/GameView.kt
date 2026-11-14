@@ -34,7 +34,7 @@ class GameView(private val ctx: Context) : SurfaceView(ctx), SurfaceHolder.Callb
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
                     setPackage("com.whatsapp")
-                    putExtra(Intent.EXTRA_TEXT, "Battle me in Kursi Clash! Room code: $code\nJoin the fight: https://fightkaro.com/#room=$code")
+                    putExtra(Intent.EXTRA_TEXT, "Battle me in Kursi Clash! Room code: $code\nJoin the fight and clash for the throne!")
                 }
                 ctx.startActivity(intent)
             } catch (e: Exception) {

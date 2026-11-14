@@ -2,6 +2,7 @@ package com.comedyarena.politicalfight
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -40,6 +41,11 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
     var punchChain = 0
     var wins = 0
     val held = BooleanArray(9)
+    private val legPath = Path()
+    private val armPath = Path()
+    private val kurtaPath = Path()
+    private val shoePath = Path()
+    private val fistRect = RectF()
 
     val aiLevel = when { diff < 0.4f -> 0; diff > 0.7f -> 2; else -> 1 }
     private val ai = Ai(aiLevel)
@@ -237,31 +243,32 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         c.save()
         c.translate(x, y)
         if (!portrait) {
-            p.style = Paint.Style.FILL; p.color = 0x44000000
             val sy = K.GROUND - y
-            val sw = 55f - sy * 0.05f
-            c.drawOval(-sw, sy - 9f, sw, sy + 9f, p)
+            // Soft diffuse ambient ground shadow
+            p.style = Paint.Style.FILL; p.color = 0x2A000000
+            val sw = 75f - sy * 0.05f
+            c.drawOval(-sw, sy - 8f, sw, sy + 8f, p)
         }
         c.scale(face.toFloat(), 1f)
         if (state == S.KO) { c.translate(0f, -10f); c.rotate(-80f) }
 
         var bob = 0f; var lean = 0f
         // 3D Martial Arts Guard Stance (Hands raised to chest/chin, ready to strike!)
-        var fHx = 26f; var fHy = -165f; var bHx = -10f; var bHy = -175f
-        var fFx = 26f; var fFy = 0f; var bFx = -26f; var bFy = 0f
+        var fHx = 28f; var fHy = -168f; var bHx = -12f; var bHy = -178f
+        var fFx = 22f; var fFy = 0f; var bFx = -24f; var bFy = 0f
         var mouth = false; var dead = false
 
         when (state) {
             S.IDLE -> {
-                bob = sin(anim * 1.2f) * 4f
-                fHy += sin(anim * 1.2f) * 3f
-                bHy -= sin(anim * 1.2f) * 3f
+                bob = sin(anim * 1.4f) * 4f
+                fHy += sin(anim * 1.4f) * 3f
+                bHy -= sin(anim * 1.4f) * 2f
             }
             S.WALK -> {
-                val s = sin(anim * 1.8f) * 26f
-                fFx = s + 10f; bFx = -s - 10f
+                val s = sin(anim * 1.8f) * 28f
+                fFx = s + 12f; bFx = -s - 12f
                 bob = abs(sin(anim * 1.8f)) * -5f
-                fHx = 30f - s * 0.5f; bHx = -30f + s * 0.5f
+                fHx = 32f - s * 0.5f; bHx = -28f + s * 0.5f
             }
             S.JUMP -> { fFx = 26f; fFy = -45f; bFx = -18f; bFy = -30f; fHy = -150f; bHy = -140f; fHx = 45f }
             S.CROUCH -> {
@@ -315,46 +322,282 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
             S.KO -> { fHx = -30f; fHy = -90f; bHx = -40f; bHy = -80f; dead = true }
         }
 
-        fun limb(x1: Float, y1: Float, x2: Float, y2: Float, w: Float, col: Int) {
-            p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND
-            p.strokeWidth = w + 8f; p.color = OUT; c.drawLine(x1, y1, x2, y2, p)
-            p.strokeWidth = w; p.color = col; c.drawLine(x1, y1, x2, y2, p)
+        // Contact shadows directly under the feet
+        if (!portrait && onGround) {
+            val sy = K.GROUND - y
+            p.style = Paint.Style.FILL; p.color = 0x55000000
+            c.drawOval(bFx - 14f, sy + bFy - 4f, bFx + 20f, sy + bFy + 4f, p)
+            c.drawOval(fFx - 14f, sy + fFy - 4f, fFx + 22f, sy + fFy + 4f, p)
         }
+
+        val hipY = -95f + bob
+
+        // --- Volumetric 3D Shoe Drawing ---
+        fun draw3DShoe(fx: Float, fy: Float, isBack: Boolean) {
+            val shoeColor = when (hero.id) {
+                0 -> 0xFFFAFAFA.toInt() // Mitraman: pristine royal white jutti
+                1 -> 0xFF5D4037.toInt() // Yatra Boy: brown leather sandal/chappal
+                3 -> 0xFF212121.toInt() // Tariff Taau: black formal shoes
+                else -> 0xFF4E342E.toInt() // Traditional tan/brown peshawari
+            }
+            val col = if (isBack) 0xFF3E2723.toInt() else shoeColor
+
+            // Sole strip along the ground
+            p.style = Paint.Style.FILL; p.color = 0xFF1B1B1B.toInt()
+            c.drawRoundRect(RectF(fx - 14f, fy - 2f, fx + 26f, fy + 4f), 2f, 2f, p)
+
+            // Upper shoe body with pointed/upturned toe
+            shoePath.reset()
+            shoePath.moveTo(fx - 14f, fy - 2f)
+            shoePath.quadTo(fx - 2f, fy - 14f, fx + 8f, fy - 11f)
+            shoePath.quadTo(fx + 20f, fy - 10f, fx + 28f, fy - 7f)
+            shoePath.quadTo(fx + 30f, fy - 3f, fx + 25f, fy - 1f)
+            shoePath.lineTo(fx - 14f, fy - 1f)
+            shoePath.close()
+
+            p.style = Paint.Style.FILL; p.color = col; c.drawPath(shoePath, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT; c.drawPath(shoePath, p)
+
+            // Leather highlight on top of shoe
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2f; p.color = 0x40FFFFFF
+            c.drawLine(fx - 4f, fy - 8f, fx + 16f, fy - 7f, p)
+
+            if (hero.id == 1) {
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+                c.drawLine(fx - 6f, fy - 9f, fx + 6f, fy - 2f, p)
+                c.drawLine(fx + 4f, fy - 10f, fx + 14f, fy - 2f, p)
+            }
+        }
+
+        // --- Volumetric 3D Leg with Churidar Folds ---
+        fun draw3DLeg(hx: Float, hy: Float, fx: Float, fy: Float, isBack: Boolean) {
+            val knX = (hx + fx) / 2f + (if (isBack) 7f else 13f)
+            val knY = (hy + fy) / 2f + 4f
+            val legCol = if (isBack) 0xFFE0E0E0.toInt() else 0xFFF5F5F5.toInt()
+
+            // Thigh: volumetric quad from hip to knee
+            legPath.reset()
+            legPath.moveTo(hx - 14f, hy); legPath.lineTo(hx + 14f, hy)
+            legPath.lineTo(knX + 11f, knY); legPath.lineTo(knX - 11f, knY)
+            legPath.close()
+            p.style = Paint.Style.FILL; p.color = legCol; c.drawPath(legPath, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(legPath, p)
+
+            // Thigh cloth fold highlight
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0x50FFFFFF
+            c.drawLine(hx, hy + 4f, knX, knY - 4f, p)
+
+            // Knee cap contour
+            p.style = Paint.Style.FILL; p.color = legCol
+            c.drawCircle(knX, knY, 11f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+            c.drawArc(RectF(knX - 11f, knY - 11f, knX + 11f, knY + 11f), -40f, 160f, false, p)
+
+            // Calf: from knee down to ankle
+            legPath.reset()
+            legPath.moveTo(knX - 11f, knY); legPath.lineTo(knX + 11f, knY)
+            legPath.lineTo(fx + 8f, fy - 10f); legPath.lineTo(fx - 9f, fy - 10f)
+            legPath.close()
+            p.style = Paint.Style.FILL; p.color = legCol; c.drawPath(legPath, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(legPath, p)
+
+            // Churidar horizontal wrinkle rings (authentic Indian clothing detail)
+            val rings = floatArrayOf(fy - 14f, fy - 21f, fy - 28f)
+            for (ry in rings) {
+                val rw = 9f
+                p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0x33000000
+                c.drawLine(fx - rw, ry, fx + rw, ry + 1f, p)
+                p.color = 0x66FFFFFF
+                c.drawLine(fx - rw + 1f, ry - 1f, fx + rw - 1f, ry, p)
+            }
+
+            draw3DShoe(fx, fy, isBack)
+        }
+
+        // --- Volumetric 3D Arm with Clenched Martial Arts Fist ---
+        fun draw3DArm(sx: Float, sy: Float, hx: Float, hy: Float, isBack: Boolean) {
+            val midX = (sx + hx) / 2f
+            val midY = (sy + hy) / 2f
+            val isPunching = state == S.PUNCH || state == S.SPECIAL
+            val elX = if (isPunching) midX else midX + (if (isBack) -12f else -8f)
+            val elY = if (isPunching) midY else max(midY + 14f, sy + 18f)
+
+            val armColor = hero.primaryColor
+            val sleeveCol = if (isBack) {
+                val r = (Color.red(armColor) * 0.8f).toInt()
+                val g = (Color.green(armColor) * 0.8f).toInt()
+                val b = (Color.blue(armColor) * 0.8f).toInt()
+                Color.rgb(r, g, b)
+            } else armColor
+
+            // Shoulder sphere
+            p.style = Paint.Style.FILL; p.color = sleeveCol; c.drawCircle(sx, sy, 13f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawCircle(sx, sy, 13f, p)
+
+            // Upper arm sleeve: quad from shoulder to elbow
+            armPath.reset()
+            armPath.moveTo(sx - 12f, sy); armPath.lineTo(sx + 12f, sy)
+            armPath.lineTo(elX + 9f, elY); armPath.lineTo(elX - 9f, elY)
+            armPath.close()
+            p.style = Paint.Style.FILL; p.color = sleeveCol; c.drawPath(armPath, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(armPath, p)
+
+            // Highlight along upper arm
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = 0x40FFFFFF
+            c.drawLine(sx, sy - 2f, elX, elY - 2f, p)
+
+            // Elbow cuff
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+            c.drawLine(elX - 9f, elY, elX + 9f, elY, p)
+
+            // Forearm: from elbow to wrist
+            armPath.reset()
+            armPath.moveTo(elX - 9f, elY); armPath.lineTo(elX + 9f, elY)
+            armPath.lineTo(hx + 7f, hy); armPath.lineTo(hx - 7f, hy)
+            armPath.close()
+            p.style = Paint.Style.FILL; p.color = sleeveCol; c.drawPath(armPath, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(armPath, p)
+
+            // Wrist cuff
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3f; p.color = OUT
+            c.drawLine(hx - 7f, hy, hx + 7f, hy, p)
+
+            // Clenched 3D Martial Arts Fist
+            val skin = if (isBack) {
+                val r = (Color.red(hero.skinColor) * 0.85f).toInt()
+                val g = (Color.green(hero.skinColor) * 0.85f).toInt()
+                val b = (Color.blue(hero.skinColor) * 0.85f).toInt()
+                Color.rgb(r, g, b)
+            } else hero.skinColor
+
+            fistRect.set(hx - 9f, hy - 8f, hx + 12f, hy + 9f)
+            p.style = Paint.Style.FILL; p.color = skin; c.drawRoundRect(fistRect, 5f, 5f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3.5f; p.color = OUT; c.drawRoundRect(fistRect, 5f, 5f, p)
+
+            // 4 Defined Knuckles on striking front
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2f; p.color = 0x55000000
+            c.drawLine(hx + 8f, hy - 6f, hx + 8f, hy + 7f, p)
+            c.drawLine(hx + 1f, hy - 4f, hx + 8f, hy - 4f, p)
+            c.drawLine(hx + 1f, hy, hx + 8f, hy, p)
+            c.drawLine(hx + 1f, hy + 4f, hx + 8f, hy + 4f, p)
+
+            // Wrapped Thumb flap across front
+            p.style = Paint.Style.FILL; p.color = skin
+            c.drawRoundRect(RectF(hx - 6f, hy - 1f, hx + 5f, hy + 6f), 3f, 3f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2.5f; p.color = OUT
+            c.drawRoundRect(RectF(hx - 6f, hy - 1f, hx + 5f, hy + 6f), 3f, 3f, p)
+
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2f; p.color = 0x50FFFFFF
+            c.drawLine(hx - 5f, hy - 6f, hx + 9f, hy - 6f, p)
+        }
+
+        // --- Volumetric 3D Torso: Kurta Lower Skirt, Nehru Collar, Modi Waistcoat ---
+        fun draw3DTorso() {
+            val kurtaCol = 0xFFF5F5F5.toInt()
+            val vestCol = hero.primaryColor
+
+            // 1. Kurta Lower Drape / Skirt (hangs below waist to mid-thigh)
+            kurtaPath.reset()
+            kurtaPath.moveTo(-26f, hipY - 6f)
+            kurtaPath.lineTo(26f, hipY - 6f)
+            kurtaPath.lineTo(34f, hipY + 46f)
+            kurtaPath.lineTo(-32f, hipY + 46f)
+            kurtaPath.close()
+
+            p.style = Paint.Style.FILL; p.color = kurtaCol; c.drawPath(kurtaPath, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(kurtaPath, p)
+
+            // Vertical cloth pleats & side slits
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2.5f; p.color = 0x33000000
+            c.drawLine(-12f, hipY + 4f, -14f, hipY + 44f, p)
+            c.drawLine(2f, hipY + 4f, 4f, hipY + 44f, p)
+            c.drawLine(16f, hipY + 4f, 20f, hipY + 44f, p)
+            p.color = 0x40FFFFFF
+            c.drawLine(-10f, hipY + 4f, -12f, hipY + 44f, p)
+            c.drawLine(4f, hipY + 4f, 6f, hipY + 44f, p)
+
+            // 2. Nehru Collar Band around neck base
+            val collarRect = RectF(-14f, -196f + bob, 14f, -182f + bob)
+            p.style = Paint.Style.FILL; p.color = vestCol; c.drawRoundRect(collarRect, 4f, 4f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 3.5f; p.color = OUT; c.drawRoundRect(collarRect, 4f, 4f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2.5f; p.color = OUT
+            c.drawLine(0f, -196f + bob, 0f, -182f + bob, p)
+
+            // 3. Nehru Waistcoat / Modi Vest (Chest & Abdomen)
+            val vestRect = RectF(-34f, -182f + bob, 34f, hipY)
+            p.style = Paint.Style.FILL; p.color = vestCol; c.drawRoundRect(vestRect, 18f, 18f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4.5f; p.color = OUT; c.drawRoundRect(vestRect, 18f, 18f, p)
+
+            // Center vertical button placket band
+            p.style = Paint.Style.FILL; p.color = 0x22000000
+            c.drawRect(-5f, -182f + bob, 5f, hipY, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2f; p.color = 0x33000000
+            c.drawLine(-5f, -182f + bob, -5f, hipY, p)
+            c.drawLine(5f, -182f + bob, 5f, hipY, p)
+
+            // 4 Brass / Golden Buttons with 3D specular highlight
+            val btnYs = floatArrayOf(-166f, -146f, -126f, -106f)
+            for (by in btnYs) {
+                val yPos = by + bob
+                p.style = Paint.Style.FILL; p.color = 0xFFFFD700.toInt()
+                c.drawCircle(0f, yPos, 3.5f, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f; p.color = OUT
+                c.drawCircle(0f, yPos, 3.5f, p)
+                p.style = Paint.Style.FILL; p.color = Color.WHITE
+                c.drawCircle(-1f, yPos - 1f, 1.2f, p)
+            }
+
+            // Left Breast Welt Pocket with pocket square
+            val pocketRect = RectF(-26f, -154f + bob, -10f, -144f + bob)
+            p.style = Paint.Style.FILL; p.color = 0xFFFFFFFF.toInt()
+            c.drawRoundRect(RectF(-24f, -158f + bob, -12f, -153f + bob), 2f, 2f, p)
+            p.style = Paint.Style.FILL; p.color = vestCol; c.drawRoundRect(pocketRect, 3f, 3f, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2.5f; p.color = OUT; c.drawRoundRect(pocketRect, 3f, 3f, p)
+
+            // 3D Rounded Chest Volume Lighting
+            p.style = Paint.Style.FILL; p.color = 0x25FFFFFF
+            c.drawRoundRect(RectF(-28f, -178f + bob, 10f, hipY - 6f), 12f, 12f, p)
+            p.color = 0x22000000
+            c.drawRoundRect(RectF(-33f, -178f + bob, -24f, hipY - 6f), 6f, 6f, p)
+        }
+
         fun circ(cx: Float, cy: Float, r: Float, col: Int) {
             p.style = Paint.Style.FILL; p.color = col; c.drawCircle(cx, cy, r, p)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawCircle(cx, cy, r, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawCircle(cx, cy, r, p)
         }
         fun rr(l: Float, t2: Float, r: Float, b: Float, rad: Float, col: Int) {
             p.style = Paint.Style.FILL; p.color = col; c.drawRoundRect(l, t2, r, b, rad, rad, p)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawRoundRect(l, t2, r, b, rad, rad, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawRoundRect(l, t2, r, b, rad, rad, p)
         }
         fun line(x1: Float, y1: Float, x2: Float, y2: Float, w: Float, col: Int) {
             p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND; p.strokeWidth = w; p.color = col
             c.drawLine(x1, y1, x2, y2, p)
         }
 
-        val hipY = -95f + bob
-        val pants = 0xFFF5F5F5.toInt()
-        // back leg
-        limb(-8f, hipY, bFx, bFy, 24f, pants); circ(bFx + 6f, bFy - 4f, 13f, 0xFF4E342E.toInt())
+        // Layer 1: Back Leg + Back Mojari
+        draw3DLeg(-10f, hipY, bFx, bFy, isBack = true)
 
         c.save()
         c.translate(0f, hipY); c.rotate(lean); c.translate(0f, -hipY)
-        // back arm
-        limb(-18f, -160f + bob, bHx, bHy, 20f, hero.primaryColor); circ(bHx, bHy, 13f, hero.skinColor)
-        // 3D Shaded Torso
-        rr(-38f, -178f + bob, 38f, -88f + bob, 28f, hero.primaryColor)
-        p.style = Paint.Style.FILL; p.color = 0x33FFFFFF; c.drawRoundRect(RectF(-32f, -174f + bob, 8f, -92f + bob), 18f, 18f, p)
-        p.color = 0x55000000; c.drawRect(-36f, -138f + bob, 36f, -124f + bob, p)
 
-        // cartoon caricature head
+        // Layer 2: Back Arm + Clenched Fist
+        draw3DArm(-20f, -162f + bob, bHx, bHy, isBack = true)
+
+        // Layer 3: Volumetric Torso, Kurta Drape & Modi Vest
+        draw3DTorso()
+
+        // Layer 4: Expressive Caricature Head
         val cx = 4f; val cy = -212f + bob
         drawCartoonHead(c, p, cx, cy, dead, mouth, OUT, ::circ, ::line, ::rr)
-        // front arm
-        limb(18f, -160f + bob, fHx, fHy, 20f, hero.primaryColor); circ(fHx, fHy, 14f, hero.skinColor)
+
+        // Layer 5: Front Arm in Martial Arts Guard
+        draw3DArm(20f, -162f + bob, fHx, fHy, isBack = false)
+
         c.restore()
-        // front leg
-        limb(8f, hipY, fFx, fFy, 24f, pants); circ(fFx + 6f, fFy - 4f, 13f, 0xFF4E342E.toInt())
+
+        // Layer 6: Front Leg + Churidar Folds + Front Mojari
+        draw3DLeg(10f, hipY, fFx, fFy, isBack = false)
+
         c.restore()
         p.strokeCap = Paint.Cap.BUTT
     }

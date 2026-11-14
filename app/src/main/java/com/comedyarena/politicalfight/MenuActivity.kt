@@ -166,19 +166,13 @@ class MenuActivity : Activity() {
     }
 
     private fun start(mode: String, p1: Int, p2: Int, level: Int, arena: Int = Prefs.stage) {
-        val i = Intent(this, MainActivity::class.java)
-        i.putExtra("mode", mode); i.putExtra("p1", p1); i.putExtra("p2", p2); i.putExtra("level", level); i.putExtra("arena", arena)
-        startActivity(i)
-    }
-
-    private fun startRetro(mode: String, p1: Int, p2: Int, level: Int, arena: Int = Prefs.stage) {
         val i = Intent(this, GameActivity::class.java)
         i.putExtra("mode", mode); i.putExtra("p1", p1); i.putExtra("p2", p2); i.putExtra("level", level); i.putExtra("arena", arena)
         startActivity(i)
     }
 
     private fun startOnlineMatch(code: String, p1Hero: Int, p2Hero: Int, stage: Int, isHost: Boolean) {
-        val i = Intent(this, MainActivity::class.java)
+        val i = Intent(this, GameActivity::class.java)
         i.putExtra("mode", "online")
         i.putExtra("p1", p1Hero)
         i.putExtra("p2", p2Hero)
@@ -243,25 +237,19 @@ class MenuActivity : Activity() {
         val sv = ScrollView(this)
         val col = LinearLayout(this); col.orientation = LinearLayout.VERTICAL
         fun add(t: String, c: Int, a: () -> Unit) = col.addView(btn(t, c, a), lp(ViewGroup.LayoutParams.MATCH_PARENT, dp(44), 0f, 3))
-        add("🔥  PLAY 3D SANSAD FIGHT (REAL 3D)", 0xFFE65100.toInt()) {
-            charSelect("CHOOSE 3D FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; start("quick", h, -1, 1, stg) }
-        }
-        add("🌐  PLAY WITH A FRIEND (ONLINE 3D)", 0xFF1976D2.toInt()) {
-            start("online", Prefs.hero, -1, 1, Prefs.stage)
-        }
         add("🥊  PLAY GAME (VS CPU)", 0xFF43A047.toInt()) {
             charSelect("CHOOSE YOUR FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; start("quick", h, -1, 1, stg) }
         }
-        add("🏆  STORY MODE (500 LEVELS)", 0xFFEF6C00.toInt()) {
-            charSelect("CHOOSE YOUR FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; showLevels() }
+        add("🌐  PLAY WITH A FRIEND (ONLINE)", 0xFF1976D2.toInt()) {
+            showPlayWithFriend(Prefs.hero, Prefs.stage)
         }
         add("👥  LOCAL 2 PLAYER (SPLIT)", 0xFF1E88E5.toInt()) {
             charSelect("PLAYER 1: PICK A FIGHTER", 0) { h1, stg ->
-                charSelect("PLAYER 2: PICK A FIGHTER", 1) { h2, _ -> startRetro("two", h1, h2, 1, stg) }
+                charSelect("PLAYER 2: PICK A FIGHTER", 1) { h2, _ -> start("two", h1, h2, 1, stg) }
             }
         }
-        add("🕹️  CLASSIC 2D RETRO ARENA", 0xFF546E7A.toInt()) {
-            charSelect("CHOOSE 2D FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; startRetro("quick", h, -1, 1, stg) }
+        add("🏆  STORY MODE (500 LEVELS)", 0xFFEF6C00.toInt()) {
+            charSelect("CHOOSE YOUR FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; showLevels() }
         }
         add("🥋  CHARACTER COLLECTION", 0xFF6D4C41.toInt()) {
             charSelect("CHARACTER COLLECTION", Prefs.hero) { h, _ -> Prefs.hero = h; showHome() }

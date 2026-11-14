@@ -75,10 +75,7 @@ class MainActivity : Activity() {
             }
 
             addJavascriptInterface(WebAppInterface(this@MainActivity), "Android")
-
-            // Load fightkaro.com real 3D arena
-            val targetUrl = "https://fightkaro.com/"
-            loadUrl(targetUrl)
+            loadUrl("file:///android_asset/game/index.html")
         }
 
         setContentView(webView)
@@ -160,8 +157,8 @@ class MainActivity : Activity() {
         fun shareRoomCode(code: String) {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, "Battle me in Sansad Showdown!")
-                putExtra(Intent.EXTRA_TEXT, "Join my 3D arena match in Sansad Showdown using Room Code: $code\nFight link: https://fightkaro.com/#room=$code")
+                putExtra(Intent.EXTRA_SUBJECT, "Battle me in Neta Fight!")
+                putExtra(Intent.EXTRA_TEXT, "Join my arena match in Neta Fight using Room Code: $code\nGet ready for the great power battle!")
             }
             activity.startActivity(Intent.createChooser(intent, "Share Room Code"))
         }

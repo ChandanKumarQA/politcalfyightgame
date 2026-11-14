@@ -37,7 +37,7 @@
             android:screenOrientation="sensorLandscape"
             android:configChanges="screenSize|orientation|screenLayout|smallestScreenSize" />
 
-        <!-- WebGL / 3D Mode Activity (Fightkaro 3D Arena) -->
+        <!-- Offline WebGL 3D Game Engine Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -23,7 +23,9 @@ class GameActivity : Activity() {
             intent.getIntExtra("p1", 0),
             intent.getIntExtra("p2", 1),
             intent.getIntExtra("level", 1),
-            intent.getIntExtra("arena", 0)
+            intent.getIntExtra("arena", 0),
+            intent.getBooleanExtra("isHost", true),
+            intent.getStringExtra("roomCode") ?: ""
         )
         AdManager.loadInterstitial(this)
         gv = GameView(this, cfg) {
@@ -41,6 +43,10 @@ class GameActivity : Activity() {
 
     override fun onResume() { super.onResume(); immersive(); Sfx.startMusic() }
     override fun onPause() { super.onPause(); Sfx.stopMusic(); gv.autoPause() }
+    override fun onDestroy() {
+        FirebaseMultiplayer.stopPolling()
+        super.onDestroy()
+    }
     @Suppress("DEPRECATION")
     override fun onBackPressed() { gv.togglePause() }
 }

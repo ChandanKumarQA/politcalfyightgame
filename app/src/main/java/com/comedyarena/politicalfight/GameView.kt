@@ -18,8 +18,16 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/** mode: story | quick | party | tourney | two */
-class Cfg(val mode: String, val p1: Int, val p2: Int, val level: Int, val arena: Int = 0)
+/** mode: story | quick | party | tourney | two | online */
+class Cfg(
+    val mode: String,
+    val p1: Int,
+    val p2: Int,
+    val level: Int,
+    val arena: Int = 0,
+    val isHost: Boolean = true,
+    val roomCode: String = ""
+)
 
 private class Proj(var x: Float, var y: Float, val vx: Float, val owner: Fighter, val dmg: Float,
                    val r: Float, val label: String, val col: Int, val wob: Boolean) { var age = 0 }
@@ -140,6 +148,11 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
                 p1 = Fighter(h1, 380f, false)
                 p2 = Fighter(heroes[cfg.p2], W - 380f, false)
                 banner = "TWO PLAYER BATTLE"
+            }
+            "online" -> {
+                p1 = Fighter(h1, 380f, false)
+                p2 = Fighter(heroes[cfg.p2], W - 380f, false)
+                banner = "ONLINE MATCH · ROOM ${cfg.roomCode}"
             }
             else -> {
                 var o = rnd.nextInt(heroes.size); if (o == cfg.p1) o = (o + 1) % heroes.size
@@ -266,8 +279,29 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
             comboTimer--
             if (comboTimer == 0) comboCount = 0
         }
-        System.arraycopy(held[0], 0, p1.held, 0, 7)
-        if (cfg.mode == "two") System.arraycopy(held[1], 0, p2.held, 0, 7) else p2.think(p1)
+
+        if (cfg.mode == "online") {
+            if (cfg.isHost) {
+                System.arraycopy(held[0], 0, p1.held, 0, 7)
+            } else {
+                System.arraycopy(held[0], 0, p2.held, 0, 7)
+            }
+            // Send inputs to Firebase Realtime Database
+            if (tm.toInt() % 6 == 0 && cfg.roomCode.isNotEmpty()) {
+                val myHeld = if (cfg.isHost) p1.held else p2.held
+                var bits = 0
+                for (k in 0..6) if (myHeld[k]) bits = bits or (1 shl k)
+                val myHp = if (cfg.isHost) p1.hp else p2.hp
+                FirebaseMultiplayer.sendInputs(cfg.roomCode, cfg.isHost, bits, myHp)
+            }
+        } else if (cfg.mode == "two") {
+            System.arraycopy(held[0], 0, p1.held, 0, 7)
+            System.arraycopy(held[1], 0, p2.held, 0, 7)
+        } else {
+            System.arraycopy(held[0], 0, p1.held, 0, 7)
+            p2.think(p1)
+        }
+
         p1.update(p2); p2.update(p1)
 
         // keep fighters from overlapping
@@ -365,6 +399,7 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
 
         resultTitle = when {
             isDraw -> "DRAW!"
+            cfg.mode == "online" -> if ((winnerP1 && cfg.isHost) || (!winnerP1 && !cfg.isHost)) "YOU WIN!" else "YOU LOSE!"
             cfg.mode == "two" -> if (winnerP1) "PLAYER 1 WINS!" else "PLAYER 2 WINS!"
             humanWon && cfg.mode == "story" && curLevel == 500 -> "THE ULTIMATE GRAND CHAMPION!"
             humanWon && cfg.mode == "tourney" && tRound == 3 -> "TOURNAMENT CHAMPION!"
@@ -554,9 +589,20 @@ class GameView(ctx: Context, private val cfg: Cfg, private val onExit: () -> Uni
         // --- Fighter Names ---
         paint.style = Paint.Style.FILL; paint.textSize = 22f; paint.typeface = Typeface.DEFAULT_BOLD
         paint.textAlign = Paint.Align.LEFT; paint.color = 0xFFFFEB3B.toInt()
-        c.drawText("${p1.hero.name} (YOU)", 182f, 88f, paint)
+        val p1Name = when (cfg.mode) {
+            "online" -> "${p1.hero.name} " + if (cfg.isHost) "(YOU)" else "(FRIEND)"
+            "two" -> "P1 · ${p1.hero.name}"
+            else -> "${p1.hero.name} (YOU)"
+        }
+        c.drawText(p1Name, 182f, 88f, paint)
+
         paint.textAlign = Paint.Align.RIGHT; paint.color = 0xFF81D4FA.toInt()
-        c.drawText("${p2.hero.name} (${if (cfg.mode == "two") "P2" else "CPU"})", W - 182f, 88f, paint)
+        val p2Name = when (cfg.mode) {
+            "online" -> "${p2.hero.name} " + if (!cfg.isHost) "(YOU)" else "(FRIEND)"
+            "two" -> "P2 · ${p2.hero.name}"
+            else -> "${p2.hero.name} (CPU)"
+        }
+        c.drawText(p2Name, W - 182f, 88f, paint)
 
         // --- SHAKTI Meter Bars ---
         val meterW = min(360f, barW - 60f)

@@ -19,6 +19,12 @@ object Prefs {
     var stage: Int
         get() = sp.getInt("stage", 0)
         set(v) = sp.edit().putInt("stage", v.coerceIn(0, 2)).apply()
+    var cpuDiff: Float
+        get() = sp.getFloat("cpu_diff", 0.5f)
+        set(v) = sp.edit().putFloat("cpu_diff", v).apply()
+    var firebaseUrl: String
+        get() = sp.getString("firebase_url", "https://politicalfight-default-rtdb.firebaseio.com") ?: "https://politicalfight-default-rtdb.firebaseio.com"
+        set(v) = sp.edit().putString("firebase_url", v).apply()
     var best: Int
         get() = sp.getInt("best", 0)
         set(v) = sp.edit().putInt("best", v).apply()

@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>NETA FIGHT – THE GREAT POWER BATTLE</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="loading-state">
+  <!-- 3D Canvas -->
+  <div id="canvas-container">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <!-- Screen Flash & Particle Overlay -->
+  <div id="vfx-flash"></div>
+  <div id="vfx-vignette"></div>
+
+  <!-- Floating 3D Combo & Announcement Layer -->
+  <div id="announcement-layer">
+    <div id="announcement-text"></div>
+  </div>
+  <div id="combo-layer"></div>
+
+  <!-- ==================== IN-FIGHT HUD ==================== -->
+  <div id="fight-hud" class="screen-layer hidden">
+    <!-- Top Bar: Fighter Info, Health, Timer -->
+    <div class="hud-top">
+      <!-- Player 1 -->
+      <div class="hud-fighter p1">
+        <div class="fighter-portrait-box">
+          <div class="portrait-avatar" id="hud-p1-avatar"></div>
+        </div>
+        <div class="fighter-details">
+          <div class="fighter-name-row">
+            <span class="fighter-label">1P · YOU</span>
+            <span class="fighter-name" id="hud-p1-name">MITRA MAN</span>
+          </div>
+          <div class="bar-container hp-bar">
+            <div class="hp-trail" id="p1-hp-trail"></div>
+            <div class="hp-fill" id="p1-hp-fill"></div>
+          </div>
+          <div class="win-markers" id="p1-wins">
+            <span class="dot" id="p1-win-1"></span>
+            <span class="dot" id="p1-win-2"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Round & Timer -->
+      <div class="hud-center">
+        <div id="round-banner">ROUND 1</div>
+        <div id="fight-timer">60</div>
+        <button id="btn-pause" title="Pause Game (Esc)">II</button>
+      </div>
+
+      <!-- Player 2 / CPU -->
+      <div class="hud-fighter p2">
+        <div class="fighter-details right-align">
+          <div class="fighter-name-row">
+            <span class="fighter-name" id="hud-p2-name">YATRA BOY</span>
+            <span class="fighter-label" id="hud-p2-label">CPU</span>
+          </div>
+          <div class="bar-container hp-bar">
+            <div class="hp-trail" id="p2-hp-trail"></div>
+            <div class="hp-fill" id="p2-hp-fill"></div>
+          </div>
+          <div class="win-markers" id="p2-wins">
+            <span class="dot" id="p2-win-1"></span>
+            <span class="dot" id="p2-win-2"></span>
+          </div>
+        </div>
+        <div class="fighter-portrait-box">
+          <div class="portrait-avatar" id="hud-p2-avatar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Bar: Shakti Super Meters -->
+    <div class="hud-bottom">
+      <div class="meter-box p1-shakti">
+        <span class="meter-title">⚡ SHAKTI</span>
+        <div class="bar-container shakti-bar">
+          <div class="shakti-fill" id="p1-shakti-fill"></div>
+        </div>
+        <span class="shakti-badge" id="p1-shakti-ready">MAX!</span>
+      </div>
+
+      <div class="meter-box p2-shakti">
+        <span class="shakti-badge" id="p2-shakti-ready">MAX!</span>
+        <div class="bar-container shakti-bar">
+          <div class="shakti-fill" id="p2-shakti-fill"></div>
+        </div>
+        <span class="meter-title">SHAKTI ⚡</span>
+      </div>
+    </div>
+
+    <!-- Live Parody Newsdesk Ticker -->
+    <div id="newsdesk-container">
+      <div class="newsdesk-bar">
+        <div class="newsdesk-live"><span class="blink-dot">●</span> LIVE</div>
+        <div class="news-anchor anchor-left">
+          <div class="anchor-avatar anchor-shor"></div>
+          <div class="anchor-meta">
+            <span class="anchor-channel">BREAKING BAKWAS</span>
+            <span class="anchor-name">SHOR SHARMA</span>
+            <span class="anchor-speech" id="anchor-speech-left">Desh jaanna chahta hai!</span>
+          </div>
+        </div>
+        <div class="news-vs">VS</div>
+        <div class="news-anchor anchor-right">
+          <div class="anchor-avatar anchor-troll"></div>
+          <div class="anchor-meta">
+            <span class="anchor-channel">TROLL ARMY</span>
+            <span class="anchor-name">TWEETY TROLLWALA</span>
+            <span class="anchor-speech" id="anchor-speech-right">#NetaFight trending No. 1 worldwide!</span>
+          </div>
+        </div>
+      </div>
+      <div class="news-ticker">
+        <span class="ticker-badge">BREAKING NEWS</span>
+        <div class="ticker-content" id="ticker-text">
+          <span>PARLIAMENT ADJOURNED: Ring-side chai stalls report historic samosa deficit · OPPOSITION CALLS FOR REVIEW OF DROPKICK TRAJECTORY · EXIT POLL PREDICTS BOTH FIGHTERS WILL CLAIM VICTORY BEFORE ROUND 1 ENDS · LOCAL ASTROLOGER CLAIMS SPECIAL MOVES ARE GOVERNED BY RETROGRADE JUPITER</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Touch Controls -->
+    <div id="touch-controls">
+      <!-- Left Joystick / D-Pad -->
+      <div id="touch-joystick">
+        <div class="joystick-base">
+          <div class="joystick-knob" id="joystick-knob"></div>
+        </div>
+        <div class="joystick-arrows">
+          <span class="dir-btn up">▲</span>
+          <span class="dir-btn down">▼</span>
+          <span class="dir-btn left">◀</span>
+          <span class="dir-btn right">▶</span>
+        </div>
+      </div>
+
+      <!-- Right Action Buttons -->
+      <div id="touch-actions">
+        <button class="action-btn btn-grab" data-act="grab">
+          <span class="btn-icon">🤼</span>
+          <span class="btn-label">GRAB</span>
+        </button>
+        <button class="action-btn btn-super" data-act="super">
+          <span class="btn-icon">⚡</span>
+          <span class="btn-label">SUPER</span>
+        </button>
+        <button class="action-btn btn-block" data-act="block">
+          <span class="btn-icon">🛡️</span>
+          <span class="btn-label">BLOCK</span>
+        </button>
+        <button class="action-btn btn-punch" data-act="punch">
+          <span class="btn-icon">👊</span>
+          <span class="btn-label">PUNCH</span>
+        </button>
+        <button class="action-btn btn-kick" data-act="kick">
+          <span class="btn-icon">🦵</span>
+          <span class="btn-label">KICK</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN MENU SCREEN ==================== -->
+  <div id="screen-main-menu" class="screen-layer">
+    <div class="menu-brand">
+      <div class="game-tagline">★ THE GREAT POWER BATTLE ★</div>
+      <h1 class="game-title">NETA FIGHT</h1>
+      <div class="game-subtitle">DESI PARODY 3D ARENA</div>
+    </div>
+
+    <div class="menu-buttons-panel">
+      <button class="menu-btn primary-glow" id="btn-menu-play">
+        <span class="icon">🥊</span> PLAY GAME (VS CPU)
+      </button>
+      <button class="menu-btn" id="btn-menu-friend">
+        <span class="icon">👥</span> PLAY WITH FRIEND
+      </button>
+      <button class="menu-btn" id="btn-menu-roster">
+        <span class="icon">🏆</span> CHARACTER COLLECTION
+      </button>
+      <button class="menu-btn" id="btn-menu-how">
+        <span class="icon">📖</span> HOW TO PLAY & COMBOS
+      </button>
+      <button class="menu-btn" id="btn-menu-settings">
+        <span class="icon">⚙️</span> SETTINGS
+      </button>
+      <button class="menu-btn danger-btn" id="btn-menu-exit">
+        <span class="icon">🚪</span> EXIT GAME
+      </button>
+    </div>
+
+    <div class="menu-disclaimer">
+      Political satire and parody. All characters and events are completely fictional.<br>
+      Not connected to or endorsed by any real political person or party.
+    </div>
+  </div>
+
+  <!-- ==================== CHARACTER SELECT SCREEN ==================== -->
+  <div id="screen-character-select" class="screen-layer hidden">
+    <div class="screen-header">
+      <h2>SELECT YOUR NETA</h2>
+      <div class="select-step-indicator" id="select-step-prompt">PICK PLAYER 1 NETA</div>
+    </div>
+
+    <div class="char-select-body">
+      <!-- 1P Card Plate -->
+      <div class="fighter-plate p1" id="plate-p1">
+        <div class="plate-tag">1P · YOU</div>
+        <div class="plate-avatar" id="plate-avatar-p1"></div>
+        <div class="plate-name" id="plate-name-p1">MITRA MAN</div>
+        <div class="plate-party" id="plate-party-p1">Team Vaada</div>
+        <div class="plate-super-badge" id="plate-super-p1">SUPER: MITRA CHAKRA</div>
+        <p class="plate-desc" id="plate-desc-p1">Balanced fighter. Hurls a flaming golden chakra for massive impact.</p>
+        <div class="stat-bars">
+          <div class="stat-row"><span>PWR</span><div class="stat-fill" id="stat-p1-pwr" style="width: 80%"></div></div>
+          <div class="stat-row"><span>SPD</span><div class="stat-fill" id="stat-p1-spd" style="width: 70%"></div></div>
+          <div class="stat-row"><span>DEF</span><div class="stat-fill" id="stat-p1-def" style="width: 75%"></div></div>
+        </div>
+      </div>
+
+      <!-- Center Roster Grid & Options -->
+      <div class="roster-center">
+        <div class="roster-grid" id="roster-grid">
+          <!-- Populated dynamically with 10 fighters -->
+        </div>
+
+        <div class="stage-difficulty-row">
+          <div class="pick-group">
+            <span class="label">STAGE:</span>
+            <div class="option-pills" id="stage-pills">
+              <button class="pill active" data-stage="0">SANSAD</button>
+              <button class="pill" data-stage="1">JANTAR</button>
+              <button class="pill" data-stage="2">DESI STREET</button>
+            </div>
+          </div>
+          <div class="pick-group" id="difficulty-group">
+            <span class="label">CPU:</span>
+            <div class="option-pills" id="diff-pills">
+              <button class="pill" data-diff="easy">EASY</button>
+              <button class="pill active" data-diff="normal">NORMAL</button>
+              <button class="pill" data-diff="hard">HARD</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="select-actions">
+          <button class="btn-cancel" id="btn-select-back">◀ BACK</button>
+          <button class="btn-start-fight pulse-glow" id="btn-start-match">FIGHT! ⚔️</button>
+        </div>
+      </div>
+
+      <!-- 2P / CPU Card Plate -->
+      <div class="fighter-plate p2" id="plate-p2">
+        <div class="plate-tag" id="plate-tag-p2">CPU</div>
+        <div class="plate-avatar" id="plate-avatar-p2"></div>
+        <div class="plate-name" id="plate-name-p2">YATRA BOY</div>
+        <div class="plate-party" id="plate-party-p2">Team Yatra</div>
+        <div class="plate-super-badge" id="plate-super-p2">SUPER: ALOO SE SONA</div>
+        <p class="plate-desc" id="plate-desc-p2">Speed fighter with long-range flying kicks and machine-powered super.</p>
+        <div class="stat-bars">
+          <div class="stat-row"><span>PWR</span><div class="stat-fill" id="stat-p2-pwr" style="width: 70%"></div></div>
+          <div class="stat-row"><span>SPD</span><div class="stat-fill" id="stat-p2-spd" style="width: 90%"></div></div>
+          <div class="stat-row"><span>DEF</span><div class="stat-fill" id="stat-p2-def" style="width: 65%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 2-PLAYER / ONLINE LOBBY SCREEN ==================== -->
+  <div id="screen-multiplayer" class="screen-layer hidden">
+    <h2>PLAY WITH A FRIEND</h2>
+    <div class="multiplayer-modes">
+      <div class="lobby-card">
+        <h3>SAME DEVICE (SPLIT CONTROLS)</h3>
+        <p>Play 1v1 on this phone/tablet using dual on-screen or keyboard controls!</p>
+        <button class="menu-btn primary-glow" id="btn-start-local-2p">START LOCAL 2-PLAYER</button>
+      </div>
+      <div class="lobby-card">
+        <h3>ONLINE ROOM BATTLE</h3>
+        <p>Host or join a private room with a code!</p>
+        <div class="room-action-buttons">
+          <button class="menu-btn" id="btn-create-room">CREATE ROOM</button>
+          <div class="join-room-row">
+            <input type="text" id="room-code-input" placeholder="ROOM CODE" maxlength="6">
+            <button class="menu-btn" id="btn-join-room">JOIN</button>
+          </div>
+        </div>
+        <div id="room-status-box" class="hidden">
+          <div class="room-code-display">ROOM: <span id="display-room-code">----</span></div>
+          <div class="room-spinner"></div>
+          <p id="room-status-msg">Waiting for opponent to connect...</p>
+          <button class="menu-btn small" id="btn-share-room">SHARE CODE</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn-cancel" id="btn-multiplayer-back">◀ BACK TO MAIN MENU</button>
+  </div>
+
+  <!-- ==================== HOW TO PLAY & COMBOS SCREEN ==================== -->
+  <div id="screen-how-to-play" class="screen-layer hidden">
+    <h2>HOW TO PLAY & SPECIAL COMBOS</h2>
+    <div class="how-to-body">
+      <div class="how-column">
+        <h3>🕹️ CONTROLS</h3>
+        <ul class="control-list">
+          <li><b>Movement:</b> Left Joystick or <b>A / D</b> (or <b>◀ / ▶</b>)</li>
+          <li><b>Jump:</b> Swipe Up or <b>W</b> / <b>▲</b></li>
+          <li><b>Crouch:</b> Swipe Down or <b>S</b> / <b>▼</b></li>
+          <li><b>Punch:</b> Tap PUNCH or <b>J</b></li>
+          <li><b>Kick:</b> Tap KICK or <b>K</b></li>
+          <li><b>Grab:</b> Tap GRAB or <b>I</b> (Unblockable!)</li>
+          <li><b>Block:</b> Tap BLOCK or hold Back</li>
+          <li><b>Super Attack:</b> Tap SUPER or <b>L / Space</b> (Uses ⚡ Shakti)</li>
+        </ul>
+      </div>
+      <div class="how-column">
+        <h3>🔥 COMBO STRINGS</h3>
+        <ul class="combo-list">
+          <li><span class="combo-keys">PUNCH + PUNCH + PUNCH</span> — Triple Rapid Jab</li>
+          <li><span class="combo-keys">PUNCH + PUNCH + KICK</span> — Heavy Knockback Finish</li>
+          <li><span class="combo-keys">PUNCH + KICK + KICK</span> — Flying Spin Combo</li>
+          <li><span class="combo-keys">KICK + KICK</span> — Desi Double Kick</li>
+          <li><span class="combo-keys">JUMP + KICK</span> — Flying Dropkick (Air Attack)</li>
+          <li><span class="combo-keys">CROUCH + KICK</span> — Low Sweep (Trips Opponent!)</li>
+          <li><span class="combo-keys">⚡ SHAKTI 100%</span> — Maximum Cinematic Super!</li>
+        </ul>
+      </div>
+    </div>
+    <button class="btn-cancel" id="btn-how-back">◀ BACK</button>
+  </div>
+
+  <!-- ==================== SETTINGS SCREEN ==================== -->
+  <div id="screen-settings" class="screen-layer hidden">
+    <h2>GAME SETTINGS</h2>
+    <div class="settings-box">
+      <div class="setting-item">
+        <span>SOUND EFFECTS</span>
+        <button class="toggle-btn active" id="btn-toggle-sfx">ON</button>
+      </div>
+      <div class="setting-item">
+        <span>MUSIC</span>
+        <button class="toggle-btn active" id="btn-toggle-music">ON</button>
+      </div>
+      <div class="setting-item">
+        <span>HAPTIC VIBRATION</span>
+        <button class="toggle-btn active" id="btn-toggle-haptics">ON</button>
+      </div>
+      <div class="setting-item">
+        <span>GRAPHICS QUALITY</span>
+        <div class="option-pills" id="gfx-pills">
+          <button class="pill" data-gfx="low">LOW</button>
+          <button class="pill active" data-gfx="high">HIGH (60FPS)</button>
+        </div>
+      </div>
+      <div class="setting-item">
+        <span>CAMERA DYNAMICS</span>
+        <button class="toggle-btn active" id="btn-toggle-cam">DYNAMIC</button>
+      </div>
+    </div>
+    <button class="btn-cancel" id="btn-settings-back">◀ BACK</button>
+  </div>
+
+  <!-- ==================== PAUSE SCREEN ==================== -->
+  <div id="screen-pause" class="screen-layer hidden">
+    <div class="pause-dialog">
+      <h2>CHAI BREAK ☕</h2>
+      <p>Sansad adjourned till further order!</p>
+      <div class="pause-actions">
+        <button class="menu-btn primary-glow" id="btn-pause-resume">RESUME MATCH</button>
+        <button class="menu-btn" id="btn-pause-restart">RESTART ROUND</button>
+        <button class="menu-btn danger-btn" id="btn-pause-quit">QUIT TO MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MATCH RESULT (DAILY JUMLA NEWSPAPER) ==================== -->
+  <div id="screen-result" class="screen-layer hidden">
+    <div class="newspaper-card">
+      <div class="newspaper-header">
+        <div class="newspaper-title">THE DAILY JUMLA</div>
+        <div class="newspaper-meta">SPECIAL ELECTION EDITION · PRICE: ₹0 · SENSATIONAL NEWS GUARANTEED</div>
+      </div>
+      <div class="newspaper-headline" id="result-headline">
+        HISTORIC LANDSLIDE VICTORY IN SANSAD ARENA!
+      </div>
+      <div class="newspaper-body">
+        <div class="winner-stamp" id="result-stamp">YOU WIN!</div>
+        <div class="newspaper-col">
+          <p id="result-story">
+            In an explosive three-round showdown, our champion delivered stunning dropkicks and an unforgettable special move that left the entire parliament gallery stunned.
+          </p>
+          <p class="newspaper-quote" id="result-quote">
+            "We accept the mandate, but will demand a recounting of punches!"
+          </p>
+        </div>
+      </div>
+      <div class="newspaper-actions">
+        <button class="menu-btn primary-glow" id="btn-result-rematch">REMATCH 🥊</button>
+        <button class="menu-btn" id="btn-result-roster">CHANGE FIGHTERS</button>
+        <button class="menu-btn" id="btn-result-menu">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/three.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/arenas.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

@@ -336,9 +336,9 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         c.save()
         c.translate(0f, hipY); c.rotate(lean); c.translate(0f, -hipY)
         // back arm
-        limb(-18f, -160f + bob, bHx, bHy, 20f, hero.color); circ(bHx, bHy, 13f, hero.skin)
+        limb(-18f, -160f + bob, bHx, bHy, 20f, hero.primaryColor); circ(bHx, bHy, 13f, hero.skinColor)
         // torso
-        rr(-38f, -178f + bob, 38f, -88f + bob, 28f, hero.color)
+        rr(-38f, -178f + bob, 38f, -88f + bob, 28f, hero.primaryColor)
         p.style = Paint.Style.FILL; p.color = 0x55FFFFFF; c.drawRect(-36f, -138f + bob, 36f, -124f + bob, p)
 
         // head
@@ -353,8 +353,8 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
                 c.drawCircle(cx + 4f, cy - 35f, 18f, p)
             }
         } else {
-            circ(cx, cy, 38f, hero.skin)
-            circ(cx + 36f, cy + 8f, 7f, hero.skin)
+            circ(cx, cy, 38f, hero.skinColor)
+            circ(cx + 36f, cy + 8f, 7f, hero.skinColor)
             if (dead) {
                 line(cx + 2f, cy - 10f, cx + 16f, cy + 4f, 4f, OUT); line(cx + 16f, cy - 10f, cx + 2f, cy + 4f, 4f, OUT)
                 line(cx + 20f, cy - 10f, cx + 34f, cy + 4f, 4f, OUT); line(cx + 34f, cy - 10f, cx + 20f, cy + 4f, 4f, OUT)
@@ -371,7 +371,7 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
             }
         }
         // front arm
-        limb(18f, -160f + bob, fHx, fHy, 20f, hero.color); circ(fHx, fHy, 14f, hero.skin)
+        limb(18f, -160f + bob, fHx, fHy, 20f, hero.primaryColor); circ(fHx, fHy, 14f, hero.skinColor)
         c.restore()
         // front leg
         limb(8f, hipY, fFx, fFy, 24f, pants); circ(fFx + 6f, fFy - 4f, 13f, 0xFF4E342E.toInt())

@@ -8,7 +8,10 @@ data class Hero(
     val specialName: String, val specialLabel: String, val specialColor: Int,
     val intro: String, val shout: String, val win: String, val lose: String,
     val drawableName: String
-)
+) {
+    val color: Int get() = primaryColor
+    val skin: Int get() = skinColor
+}
 
 object Roster {
     val parties = listOf(

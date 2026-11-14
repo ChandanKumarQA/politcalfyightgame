@@ -12,9 +12,12 @@ import kotlin.math.sin
 
 object K { const val W = 1600f; const val H = 900f; const val GROUND = 690f }
 
-enum class S { IDLE, WALK, JUMP, PUNCH, KICK, SPECIAL, BLOCK, HIT, WIN, KO }
+enum class S { IDLE, WALK, JUMP, CROUCH, PUNCH, KICK, GRAB, SWEEP, UPPER, SPECIAL, BLOCK, HIT, WIN, KO }
 
-/** held[] indices: 0 Left, 1 Right, 2 Jump, 3 Punch, 4 Kick, 5 Special, 6 Block */
+/**
+ * held[] indices:
+ * 0 Left, 1 Right, 2 Jump/Up, 3 Punch, 4 Kick, 5 Special, 6 Block, 7 Crouch/Down, 8 Grab
+ */
 class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float = 0.5f, hpMul: Float = 1f) {
     val maxHp = 100f * hpMul
     var hp = maxHp
@@ -34,14 +37,20 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
     var bubbleT = 0
     var stageW = 1600f
     var headBmp: Bitmap? = null
-    val held = BooleanArray(7)
+    var punchChain = 0
+    var wins = 0
+    val held = BooleanArray(9)
+
     private var aiTimer = 0
     private var aiPlan = 0
     private var aiFresh = false
     private val rnd = java.util.Random()
 
     val onGround get() = y >= K.GROUND
-    val acting get() = state == S.PUNCH || state == S.KICK || state == S.SPECIAL
+    val crouching get() = state == S.CROUCH || state == S.SWEEP || state == S.UPPER
+    val acting get() = state == S.PUNCH || state == S.KICK || state == S.GRAB ||
+            state == S.SWEEP || state == S.UPPER || state == S.SPECIAL
+
     private val speed get() = (3.5f + hero.speed * 0.55f) * (if (isAI) 0.8f + 0.2f * diff else 1f)
     val dmgMul get() = (0.75f + hero.power * 0.07f) * (if (hero.ability == 1) 1.1f else 1f) *
             (if (hero.ability == 3 && hp < maxHp * 0.3f) 1.3f else 1f)
@@ -49,35 +58,84 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
     fun say(s: String, frames: Int) { bubble = s; bubbleT = frames }
 
     private fun durOf(): Int {
-        val b = when (state) { S.PUNCH -> 18; S.KICK -> 28; S.SPECIAL -> 44; else -> 0 }
+        val b = when (state) {
+            S.PUNCH -> 16
+            S.KICK -> 24
+            S.SWEEP -> 26
+            S.UPPER -> 22
+            S.GRAB -> 30
+            S.SPECIAL -> 44
+            else -> 0
+        }
         return if (hero.ability == 0 && state != S.SPECIAL) (b * 0.8f).toInt() else b
     }
-    fun activeNow() = (state == S.PUNCH && t in 5..10) || (state == S.KICK && t in 8..15)
-    private fun reach() = (if (state == S.PUNCH) 95f else 130f) + (if (hero.ability == 6) 25f else 0f)
-    fun atkRect(): RectF {
-        val top = if (state == S.KICK) y - 130f else y - 210f
-        val bot = if (state == S.KICK) y - 20f else y - 100f
-        return if (face > 0) RectF(x + 20f, top, x + 20f + reach(), bot) else RectF(x - 20f - reach(), top, x - 20f, bot)
-    }
-    fun hurtRect() = RectF(x - 42f, y - 230f, x + 42f, y)
 
-    private fun startAtk(s: S) { state = s; t = 0; hitDone = false; vx = 0f }
+    fun activeNow(): Boolean = when (state) {
+        S.PUNCH -> t in 4..8
+        S.KICK -> t in 6..12
+        S.SWEEP -> t in 7..14
+        S.UPPER -> t in 5..10
+        S.GRAB -> t in 6..11
+        else -> false
+    }
+
+    private fun reach(): Float = when (state) {
+        S.PUNCH -> 95f + (punchChain * 12f)
+        S.KICK -> 135f
+        S.SWEEP -> 140f
+        S.UPPER -> 85f
+        S.GRAB -> 75f
+        else -> 90f
+    } + (if (hero.ability == 6) 25f else 0f)
+
+    fun atkRect(): RectF {
+        val top = when (state) {
+            S.SWEEP -> y - 80f
+            S.UPPER -> y - 240f
+            S.KICK -> y - 130f
+            S.GRAB -> y - 160f
+            else -> y - 210f
+        }
+        val bot = when (state) {
+            S.SWEEP -> y
+            S.UPPER -> y - 90f
+            S.KICK -> y - 20f
+            else -> y - 100f
+        }
+        val r = reach()
+        return if (face > 0) RectF(x + 20f, top, x + 20f + r, bot) else RectF(x - 20f - r, top, x - 20f, bot)
+    }
+
+    fun hurtRect(): RectF {
+        val top = if (crouching) y - 140f else y - 230f
+        return RectF(x - 42f, top, x + 42f, y)
+    }
+
+    private fun startAtk(s: S) {
+        state = s
+        t = 0
+        hitDone = false
+        vx = 0f
+    }
 
     /** Returns true if the hit was blocked. */
-    fun takeHit(d: Float, kb: Float, dir: Int, heavy: Boolean): Boolean {
+    fun takeHit(d: Float, kb: Float, dir: Int, heavy: Boolean, isGrab: Boolean = false): Boolean {
         if (state == S.KO || state == S.WIN) return false
         var dmg = d * (if (hero.ability == 5) 0.85f else 1f)
-        val blocked = state == S.BLOCK && face == -dir
+        val blocked = !isGrab && state == S.BLOCK && face == -dir
+
         if (blocked) {
             hp -= dmg * 0.12f
             vx = dir * kb * 0.4f
-            meter = min(100f, meter + 3f)
+            meter = 100f
         } else {
             hp -= dmg
             vx = dir * kb
-            stun = if (heavy) 28 else 16
-            state = S.HIT; t = 0
-            meter = min(100f, meter + dmg * 0.8f * (if (hero.ability == 4) 1.6f else 1f))
+            stun = if (heavy || isGrab) 28 else 16
+            state = S.HIT
+            t = 0
+            if (isGrab) vy = -8f
+            meter = 100f
         }
         if (hp <= 0f) { hp = 0f; state = S.KO; vy = -10f; vx = dir * 6f }
         return blocked
@@ -90,26 +148,37 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         aiFresh = false
         val dist = abs(opp.x - x)
         val dir = if (opp.x > x) 1 else -1
+
         if (aiTimer <= 0) {
-            aiTimer = (6 + (1f - diff) * 28f).toInt() + rnd.nextInt(8)
+            aiTimer = (6 + (1f - diff) * 26f).toInt() + rnd.nextInt(8)
             aiFresh = true
             val r = rnd.nextFloat()
             aiPlan = when {
-                dist in 220f..800f && r < 0.3f + diff * 0.3f -> 5
-                opp.acting && dist < 200f && r < 0.15f + diff * 0.75f -> 4
-                dist > 170f -> if (r < 0.12f) 7 else 1
-                else -> when { r < 0.35f -> 2; r < 0.55f -> 3; r < 0.65f -> 5; r < 0.75f -> 6; r < 0.85f -> 7; r < 0.92f -> 4; else -> 0 }
+                dist in 200f..750f && r < 0.25f + diff * 0.25f -> 5 // Special
+                opp.acting && dist < 180f && r < 0.15f + diff * 0.7f -> 4 // Block
+                dist < 80f && r < 0.35f -> 8 // Grab
+                dist > 180f -> if (r < 0.14f) 7 else 1 // Approach
+                else -> when {
+                    r < 0.30f -> 2 // Punch
+                    r < 0.50f -> 3 // Kick
+                    r < 0.65f -> 6 // Crouch Sweep / Uppercut
+                    r < 0.75f -> 8 // Grab
+                    r < 0.85f -> 5 // Special
+                    else -> 0
+                }
             }
         }
         val toward = if (dir > 0) 1 else 0
         val away = if (dir > 0) 0 else 1
         when (aiPlan) {
-            1, 7 -> { held[toward] = true; if (aiPlan == 7 && aiFresh) held[2] = true }
-            2 -> { if (aiFresh) held[3] = true else if (dist > 120f) held[toward] = true }
-            3 -> { if (aiFresh) held[4] = true else if (dist > 150f) held[toward] = true }
+            1 -> held[toward] = true
+            7 -> { held[toward] = true; if (aiFresh) held[2] = true }
+            2 -> { if (aiFresh) held[3] = true else if (dist > 110f) held[toward] = true }
+            3 -> { if (aiFresh) held[4] = true else if (dist > 130f) held[toward] = true }
             4 -> held[6] = true
             5 -> { if (aiFresh) held[5] = true }
-            6 -> held[away] = true
+            6 -> { held[7] = true; if (aiFresh) held[if (rnd.nextBoolean()) 3 else 4] = true }
+            8 -> { if (aiFresh) held[8] = true else held[toward] = true }
         }
     }
 
@@ -124,27 +193,67 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         }
 
         if (stun > 0) {
-            stun--; vx *= 0.9f
+            stun--
+            vx *= 0.9f
             if (stun == 0 && state == S.HIT) state = S.IDLE
         } else if (acting) {
             t++
             vx *= 0.8f
             if (state == S.SPECIAL && t == 14) spawnFlag = true
-            if (t >= durOf()) { state = S.IDLE; t = 0 }
+
+            // Combo cancels: PUNCH can chain up to 3 times on hit
+            if (state == S.PUNCH && hitDone && t in 6..14) {
+                if (held[3] && punchChain < 2) {
+                    punchChain++
+                    startAtk(S.PUNCH)
+                    return
+                }
+                if (held[4]) {
+                    startAtk(S.KICK)
+                    return
+                }
+            }
+
+            if (t >= durOf()) {
+                state = S.IDLE
+                t = 0
+                punchChain = 0
+            }
         } else {
             if (onGround) face = if (opp.x >= x) 1 else -1
+
             if (held[6] && onGround) {
-                state = S.BLOCK; vx = 0f
+                state = S.BLOCK
+                vx = 0f
+            } else if (held[7] && onGround) {
+                // CROUCH
+                if (held[3]) {
+                    startAtk(S.UPPER)
+                } else if (held[4]) {
+                    startAtk(S.SWEEP)
+                } else {
+                    state = S.CROUCH
+                    vx = 0f
+                }
             } else {
-                if (state == S.BLOCK) state = S.IDLE
+                if (state == S.BLOCK || state == S.CROUCH) state = S.IDLE
                 var mv = 0f
                 if (held[0]) mv -= 1f
                 if (held[1]) mv += 1f
                 vx = mv * speed * (if (!onGround && hero.ability == 7) 1.2f else 1f)
-                if (held[2] && onGround) vy = -(17f + hero.jump * 0.8f) * (if (hero.ability == 7) 1.15f else 1f)
-                if (held[5]) { startAtk(S.SPECIAL) }
-                else if (held[3]) startAtk(S.PUNCH)
-                else if (held[4]) startAtk(S.KICK)
+
+                if (held[2] && onGround) {
+                    vy = -(17f + hero.jump * 0.8f) * (if (hero.ability == 7) 1.15f else 1f)
+                }
+
+                if (held[8] && onGround) {
+                    startAtk(S.GRAB)
+                } else if (held[3]) {
+                    startAtk(S.PUNCH)
+                } else if (held[4]) {
+                    startAtk(S.KICK)
+                }
+
                 if (!acting) state = if (!onGround) S.JUMP else if (mv != 0f) S.WALK else S.IDLE
             }
         }
@@ -178,6 +287,7 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         var fHx = 36f; var fHy = -105f; var bHx = -34f; var bHy = -105f
         var fFx = 22f; var fFy = 0f; var bFx = -22f; var bFy = 0f
         var mouth = false; var dead = false
+
         when (state) {
             S.IDLE -> { bob = sin(anim * 0.6f) * 3f; fHy += bob; bHy += bob }
             S.WALK -> {
@@ -187,20 +297,39 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
                 fHx = 30f - s * 0.5f; bHx = -30f + s * 0.5f
             }
             S.JUMP -> { fFx = 26f; fFy = -45f; bFx = -18f; bFy = -30f; fHy = -150f; bHy = -140f; fHx = 45f }
+            S.CROUCH -> {
+                bob = 35f // lower body down
+                fFx = 35f; fFy = 0f; bFx = -30f; bFy = 0f
+                fHy += 20f; bHy += 20f
+            }
             S.PUNCH -> {
-                val e = ext(5, 10, durOf())
-                when (hero.id % 3) {
-                    0 -> { fHx = 36f + 95f * e; fHy = -150f }
-                    1 -> { fHx = 36f + 80f * e; fHy = -200f + 50f * e }
-                    else -> { fHx = 36f + 80f * e; fHy = -150f; bHx = -34f + 70f * e; bHy = -135f }
-                }
-                lean = 8f * e
+                val e = ext(4, 8, durOf())
+                fHx = 36f + (85f + punchChain * 20f) * e
+                fHy = -150f - punchChain * 10f
+                lean = (8f + punchChain * 4f) * e
+            }
+            S.UPPER -> {
+                val e = ext(4, 9, durOf())
+                bob = 20f * (1f - e)
+                fHx = 30f + 30f * e; fHy = -120f - 110f * e
+                lean = -8f * e
             }
             S.KICK -> {
-                val e = ext(8, 15, durOf())
-                val high = hero.id % 2 == 0
-                fFx = 22f + 105f * e; fFy = if (high) -110f * e else -50f * e
+                val e = ext(6, 12, durOf())
+                fFx = 22f + 110f * e; fFy = -70f * e
                 lean = -12f * e; fHx = 20f; fHy = -140f; bHx = -50f; bHy = -130f
+            }
+            S.SWEEP -> {
+                val e = ext(6, 14, durOf())
+                bob = 40f
+                fFx = 24f + 120f * e; fFy = 0f
+                lean = -14f * e
+            }
+            S.GRAB -> {
+                val e = ext(5, 10, durOf())
+                fHx = 30f + 65f * e; fHy = -140f
+                bHx = -20f + 55f * e; bHy = -140f
+                lean = 10f * e
             }
             S.SPECIAL -> {
                 val e = min(1f, t / 14f)
@@ -249,6 +378,7 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         // torso
         rr(-38f, -178f + bob, 38f, -88f + bob, 28f, hero.color)
         p.style = Paint.Style.FILL; p.color = 0x55FFFFFF; c.drawRect(-36f, -138f + bob, 36f, -124f + bob, p)
+
         // head
         val cx = 4f; val cy = -212f + bob
         val hb = headBmp
@@ -276,51 +406,6 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
             } else {
                 val pa = Path(); pa.moveTo(cx + 6f, cy + 18f); pa.quadTo(cx + 18f, cy + 32f, cx + 30f, cy + 18f)
                 p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT; c.drawPath(pa, p)
-            }
-            // hats / hair / accessories
-            when (hero.hat) {
-                0 -> { rr(cx - 34f, cy - 52f, cx + 34f, cy - 30f, 10f, 0xFFFFFFFF.toInt()); rr(cx - 34f, cy - 34f, cx + 34f, cy - 27f, 3f, 0xFFBDBDBD.toInt()) }
-                1 -> { circ(cx, cy - 40f, 18f, 0xFF3E2723.toInt()); circ(cx - 22f, cy - 32f, 13f, 0xFF3E2723.toInt()); circ(cx + 20f, cy - 38f, 12f, 0xFF3E2723.toInt()) }
-                2 -> { rr(cx + 2f, cy + 6f, cx + 46f, cy + 16f, 5f, 0xFF3E2723.toInt()); rr(cx - 30f, cy - 44f, cx + 24f, cy - 32f, 6f, 0xFF616161.toInt()) }
-                3 -> {
-                    rr(cx - 36f, cy - 46f, cx + 30f, cy - 28f, 12f, 0xFF9E9E9E.toInt())
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 4f; p.color = OUT
-                    c.drawCircle(cx + 10f, cy - 4f, 14f, p); c.drawCircle(cx + 28f, cy - 4f, 13f, p); c.drawLine(cx + 24f, cy - 4f, cx + 14f, cy - 4f, p)
-                }
-                4 -> {
-                    p.style = Paint.Style.FILL; p.color = 0xFFFF7043.toInt(); c.drawOval(cx - 42f, cy - 62f, cx + 42f, cy - 20f, p)
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawOval(cx - 42f, cy - 62f, cx + 42f, cy - 20f, p)
-                    line(cx - 30f, cy - 30f, cx + 30f, cy - 52f, 4f, OUT); line(cx - 30f, cy - 42f, cx + 24f, cy - 58f, 4f, OUT)
-                    circ(cx + 18f, cy - 40f, 6f, 0xFFFFEB3B.toInt())
-                }
-                5 -> { rr(cx - 38f, cy - 46f, cx + 34f, cy - 20f, 18f, 0xFF212121.toInt()); circ(cx - 24f, cy - 58f, 16f, 0xFF212121.toInt()); circ(cx + 26f, cy - 22f, 5f, 0xFFD50000.toInt()) }
-                6 -> {
-                    val cr = Path(); cr.moveTo(cx - 30f, cy - 34f); cr.lineTo(cx - 30f, cy - 64f); cr.lineTo(cx - 15f, cy - 46f)
-                    cr.lineTo(cx, cy - 70f); cr.lineTo(cx + 15f, cy - 46f); cr.lineTo(cx + 30f, cy - 64f); cr.lineTo(cx + 30f, cy - 34f); cr.close()
-                    p.style = Paint.Style.FILL; p.color = 0xFFFFD600.toInt(); c.drawPath(cr, p)
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawPath(cr, p)
-                }
-                7 -> {
-                    rr(cx - 30f, cy - 70f, cx + 30f, cy - 36f, 14f, 0xFFFFEE58.toInt())
-                    p.style = Paint.Style.FILL; p.color = 0xFFFFEE58.toInt(); c.drawOval(cx - 62f, cy - 46f, cx + 62f, cy - 28f, p)
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawOval(cx - 62f, cy - 46f, cx + 62f, cy - 28f, p)
-                    p.style = Paint.Style.FILL; p.color = 0xFFE53935.toInt(); c.drawRect(cx - 30f, cy - 50f, cx + 30f, cy - 44f, p)
-                }
-                8 -> {
-                    circ(cx, cy - 38f, 20f, 0xFF212121.toInt())
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 6f; p.color = 0xFF00E5FF.toInt()
-                    c.drawArc(RectF(cx - 36f, cy - 50f, cx + 36f, cy - 10f), 180f, 180f, false, p)
-                    circ(cx - 36f, cy - 26f, 9f, 0xFF00E5FF.toInt())
-                    circ(cx + 36f, cy - 26f, 9f, 0xFF00E5FF.toInt())
-                }
-                9 -> {
-                    val turb = Path()
-                    turb.moveTo(cx - 38f, cy - 32f); turb.quadTo(cx, cy - 75f, cx + 38f, cy - 32f)
-                    turb.lineTo(cx + 34f, cy - 22f); turb.lineTo(cx - 34f, cy - 22f); turb.close()
-                    p.style = Paint.Style.FILL; p.color = 0xFFFFD700.toInt(); c.drawPath(turb, p)
-                    p.style = Paint.Style.STROKE; p.strokeWidth = 5f; p.color = OUT; c.drawPath(turb, p)
-                    circ(cx, cy - 44f, 8f, 0xFFD50000.toInt())
-                }
             }
         }
         // front arm

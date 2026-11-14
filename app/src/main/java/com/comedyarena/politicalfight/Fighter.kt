@@ -246,12 +246,17 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         if (state == S.KO) { c.translate(0f, -10f); c.rotate(-80f) }
 
         var bob = 0f; var lean = 0f
-        var fHx = 36f; var fHy = -105f; var bHx = -34f; var bHy = -105f
-        var fFx = 22f; var fFy = 0f; var bFx = -22f; var bFy = 0f
+        // 3D Martial Arts Guard Stance (Hands raised to chest/chin, ready to strike!)
+        var fHx = 26f; var fHy = -165f; var bHx = -10f; var bHy = -175f
+        var fFx = 26f; var fFy = 0f; var bFx = -26f; var bFy = 0f
         var mouth = false; var dead = false
 
         when (state) {
-            S.IDLE -> { bob = sin(anim * 0.6f) * 3f; fHy += bob; bHy += bob }
+            S.IDLE -> {
+                bob = sin(anim * 1.2f) * 4f
+                fHy += sin(anim * 1.2f) * 3f
+                bHy -= sin(anim * 1.2f) * 3f
+            }
             S.WALK -> {
                 val s = sin(anim * 1.8f) * 26f
                 fFx = s + 10f; bFx = -s - 10f
@@ -337,9 +342,10 @@ class Fighter(val hero: Hero, var x: Float, val isAI: Boolean, val diff: Float =
         c.translate(0f, hipY); c.rotate(lean); c.translate(0f, -hipY)
         // back arm
         limb(-18f, -160f + bob, bHx, bHy, 20f, hero.primaryColor); circ(bHx, bHy, 13f, hero.skinColor)
-        // torso
+        // 3D Shaded Torso
         rr(-38f, -178f + bob, 38f, -88f + bob, 28f, hero.primaryColor)
-        p.style = Paint.Style.FILL; p.color = 0x55FFFFFF; c.drawRect(-36f, -138f + bob, 36f, -124f + bob, p)
+        p.style = Paint.Style.FILL; p.color = 0x33FFFFFF; c.drawRoundRect(RectF(-32f, -174f + bob, 8f, -92f + bob), 18f, 18f, p)
+        p.color = 0x55000000; c.drawRect(-36f, -138f + bob, 36f, -124f + bob, p)
 
         // cartoon caricature head
         val cx = 4f; val cy = -212f + bob

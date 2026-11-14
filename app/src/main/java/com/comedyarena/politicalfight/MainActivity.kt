@@ -38,17 +38,23 @@ class MainActivity : Activity() {
         AdManager.init(this)
         AdManager.loadInterstitial(this)
 
-        // Setup Hardware-Accelerated WebView
+        // Setup Hardware-Accelerated 3D WebGL WebView
         webView = WebView(this).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
+                databaseEnabled = true
                 allowFileAccess = true
                 allowContentAccess = true
                 mediaPlaybackRequiresUserGesture = false
                 cacheMode = WebSettings.LOAD_DEFAULT
-                databaseEnabled = true
+                loadWithOverviewMode = true
+                useWideViewPort = true
+                displayZoomControls = false
+                builtInZoomControls = false
+                userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
             }
 
             webChromeClient = WebChromeClient()
@@ -57,10 +63,20 @@ class MainActivity : Activity() {
                     super.onPageFinished(view, url)
                     applyImmersiveMode()
                 }
+
+                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                    super.onReceivedError(view, request, error)
+                    if (request?.isForMainFrame == true) {
+                        view?.loadUrl("file:///android_asset/game/index.html")
+                    }
+                }
             }
 
             addJavascriptInterface(WebAppInterface(this@MainActivity), "Android")
-            loadUrl("file:///android_asset/game/index.html")
+
+            // Load fightkaro.com real 3D arena
+            val targetUrl = "https://fightkaro.com/"
+            loadUrl(targetUrl)
         }
 
         setContentView(webView)
@@ -97,8 +113,11 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // Send pause or back event to web game
-        webView.evaluateJavascript("if (window.dispatchEvent) { window.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'})); }", null)
+        if (webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            super.onBackPressed()
+        }
     }
 
     // --- JavaScript to Native Android Bridge ---
@@ -139,8 +158,8 @@ class MainActivity : Activity() {
         fun shareRoomCode(code: String) {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, "Battle me in Neta Fight!")
-                putExtra(Intent.EXTRA_TEXT, "Join my 3D arena match in Neta Fight using Room Code: $code\nGet ready for the great power battle!")
+                putExtra(Intent.EXTRA_SUBJECT, "Battle me in Sansad Showdown!")
+                putExtra(Intent.EXTRA_TEXT, "Join my 3D arena match in Sansad Showdown using Room Code: $code\nFight link: https://fightkaro.com/#room=$code")
             }
             activity.startActivity(Intent.createChooser(intent, "Share Room Code"))
         }

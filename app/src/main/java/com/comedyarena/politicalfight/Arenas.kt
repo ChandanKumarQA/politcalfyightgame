@@ -59,27 +59,81 @@ object Arenas {
         val midX = w / 2f
 
         when (id) {
-            0 -> { // Sansad Arena (Parliament Hall)
-                // Grand Central Dome & Circular Tier
-                p.color = 0xFFFFF8E1.toInt(); c.drawOval(RectF(midX - 300f, 60f, midX + 300f, 500f), p)
-                p.color = 0xFFFF9800.toInt(); c.drawArc(RectF(midX - 300f, 60f, midX + 300f, 500f), 180f, 60f, true, p)
-                p.color = 0xFF4CAF50.toInt(); c.drawArc(RectF(midX - 300f, 60f, midX + 300f, 500f), 300f, 60f, true, p)
-                rect(c, p, 100f, 280f, w - 100f, gy, 0xFFFFF3E0.toInt())
-                // Classical Ivory Columns
-                val numCols = (w / 120f).toInt()
+            0 -> { // Sansad Arena (Parliament Hall) - 3D Perspective Architecture
+                // Grand Curved Background Wall & Semicircular Dome
+                p.color = 0xFFFFF8E1.toInt(); c.drawOval(RectF(midX - 350f, 40f, midX + 350f, 520f), p)
+                p.color = 0xFFFF9800.toInt(); c.drawArc(RectF(midX - 350f, 40f, midX + 350f, 520f), 180f, 60f, true, p)
+                p.color = 0xFF4CAF50.toInt(); c.drawArc(RectF(midX - 350f, 40f, midX + 350f, 520f), 300f, 60f, true, p)
+                rect(c, p, 80f, 260f, w - 80f, gy, 0xFFEFEBE9.toInt())
+
+                // 3D Fluted Sandstone Columns with depth shading
+                val numCols = (w / 110f).toInt()
                 for (i in 0 until numCols) {
-                    val cx = 60f + i * 120f
-                    rect(c, p, cx, 280f, cx + 45f, gy - 20f, 0xFFECEFF1.toInt())
-                    rect(c, p, cx - 8f, 260f, cx + 53f, 285f, 0xFFCFD8DC.toInt())
+                    val cx = 40f + i * 110f
+                    // Shadow side of column
+                    rect(c, p, cx, 250f, cx + 46f, gy - 20f, 0xFFCFD8DC.toInt())
+                    // Highlight side of column (creates 3D cylindrical illusion)
+                    rect(c, p, cx + 8f, 250f, cx + 38f, gy - 20f, 0xFFECEFF1.toInt())
+                    // Capital & Base
+                    rect(c, p, cx - 8f, 240f, cx + 54f, 258f, 0xFFB0BEC5.toInt())
+                    rect(c, p, cx - 8f, gy - 25f, cx + 54f, gy - 15f, 0xFFB0BEC5.toInt())
                 }
-                // Central Wooden Speaker's Podium & Chandelier
-                rect(c, p, midX - 80f, gy - 120f, midX + 80f, gy, 0xFF3E2723.toInt())
-                circle(c, p, midX, 220f, 45f, 0xFFFFD700.toInt())
-                // Tiered Audience Gallery
-                crowd(c, p, tm, gy - 80f, w)
-                // Floor Red Carpet
-                rect(c, p, 0f, gy, w, K.H, 0xFF8B0000.toInt())
-                rect(c, p, 150f, gy + 10f, w - 150f, gy + 30f, 0xFFFFD700.toInt())
+
+                // Central Speaker's Podium & Ashoka Chakra
+                rect(c, p, midX - 90f, gy - 120f, midX + 90f, gy - 30f, 0xFF3E2723.toInt())
+                circle(c, p, midX, 220f, 48f, 0xFFFFD700.toInt())
+
+                // Tiered Audience in background
+                crowd(c, p, tm, gy - 75f, w)
+
+                // --- 3D PERSPECTIVE FLOOR (Sansad Hall Ceremonial Dais) ---
+                val floorTop = gy - 40f
+                rect(c, p, 0f, floorTop, w, K.H, 0xFF6B1D1D.toInt())
+
+                // Perspective Floor Tile Lines converging to center
+                p.style = Paint.Style.STROKE; p.strokeWidth = 2f; p.color = 0x33FFFFFF
+                val vanishingY = 500f
+                for (step in -12..12) {
+                    val bottomX = midX + step * 100f
+                    c.drawLine(midX, vanishingY, bottomX, K.H, p)
+                }
+                // Perspective Horizontal Depth Bands
+                val horizY = floatArrayOf(floorTop + 25f, floorTop + 65f, floorTop + 120f, floorTop + 185f, floorTop + 260f)
+                for (hy in horizY) {
+                    p.strokeWidth = 2.5f; p.color = 0x44FFFFFF
+                    c.drawLine(0f, hy, w, hy, p)
+                }
+
+                // Central 3D Ceremonial Mandala / Lotus Ring (Squashed Ellipse in Perspective)
+                val mY = floorTop + 130f
+                p.style = Paint.Style.FILL
+                // Ring 1: Navy Blue outer ring
+                p.color = 0xFF1A237E.toInt(); c.drawOval(RectF(midX - 440f, mY - 95f, midX + 440f, mY + 95f), p)
+                // Ring 2: Saffron Ring
+                p.color = 0xFFFF6D00.toInt(); c.drawOval(RectF(midX - 380f, mY - 80f, midX + 380f, mY + 80f), p)
+                // Ring 3: Emerald Green
+                p.color = 0xFF2E7D32.toInt(); c.drawOval(RectF(midX - 320f, mY - 65f, midX + 320f, mY + 65f), p)
+                // Ring 4: Radiant Gold
+                p.color = 0xFFFFD700.toInt(); c.drawOval(RectF(midX - 250f, mY - 50f, midX + 250f, mY + 50f), p)
+                // Ring 5: Deep Magenta center
+                p.color = 0xFFAD1457.toInt(); c.drawOval(RectF(midX - 170f, mY - 35f, midX + 170f, mY + 35f), p)
+                // Center Star
+                p.color = 0xFFFFF9C4.toInt(); c.drawOval(RectF(midX - 70f, mY - 16f, midX + 70f, mY + 16f), p)
+
+                // Glowing Diya Oil Lamps along the Dais Edge
+                val numDiyas = (w / 140f).toInt()
+                for (i in 0 until numDiyas) {
+                    val dx = 50f + i * 140f
+                    val dy = floorTop + 8f
+                    // Diya base
+                    p.style = Paint.Style.FILL; p.color = 0xFFBF360C.toInt()
+                    c.drawOval(RectF(dx - 12f, dy - 4f, dx + 12f, dy + 6f), p)
+                    // Golden flame with glow aura
+                    p.color = 0x44FFB300.toInt()
+                    c.drawCircle(dx, dy - 8f, 16f + sin(tm * 0.2f + i) * 3f, p)
+                    p.color = 0xFFFFEB3B.toInt()
+                    c.drawCircle(dx, dy - 8f, 6f, p)
+                }
             }
             1 -> { // Jantar Arena (Protest Rally Ground)
                 circle(c, p, w - 240f, 150f, 80f, 0xFFFF7043.toInt()) // Sunset Sun
@@ -99,7 +153,7 @@ object Arenas {
                 }
                 crowd(c, p, tm, gy - 110f, w)
                 bunting(c, p, 60f, tm, w)
-                rect(c, p, 0f, gy, w, K.H, 0xFF616161.toInt())
+                rect(c, p, 0f, gy - 40f, w, K.H, 0xFF546E7A.toInt())
             }
             2 -> { // Desi Street (Indian Market & Chai Tapri)
                 // Colorful Shopfronts
@@ -119,23 +173,22 @@ object Arenas {
                 // Auto Rickshaw on right
                 val rickX = w - 240f
                 rect(c, p, rickX, gy - 160f, rickX + 200f, gy - 40f, 0xFF2E7D32.toInt())
-                rect(c, p, rickX, gy - 230f, rickX + 200f, gy - 160f, 0xFFFBC02D.toInt()) // yellow top
+                rect(c, p, rickX, gy - 230f, rickX + 200f, gy - 160f, 0xFFFBC02D.toInt())
                 circle(c, p, rickX + 40f, gy - 30f, 30f, 0xFF111111.toInt())
                 circle(c, p, rickX + 160f, gy - 30f, 30f, 0xFF111111.toInt())
                 // Road with white dashed divider
-                rect(c, p, 0f, gy, w, K.H, 0xFF37474F.toInt())
+                rect(c, p, 0f, gy - 40f, w, K.H, 0xFF37474F.toInt())
                 val numDashes = (w / 200f).toInt()
                 for (i in 0 until numDashes) {
-                    rect(c, p, 50f + i * 200f, gy + 90f, 150f + i * 200f, gy + 105f, Color.WHITE)
+                    rect(c, p, 50f + i * 200f, gy + 80f, 150f + i * 200f, gy + 95f, Color.WHITE)
                 }
             }
             else -> {
                 crowd(c, p, tm, gy - 90f, w)
                 bunting(c, p, 80f, tm, w)
-                rect(c, p, 0f, gy, w, K.H, ground[id % ground.size])
+                rect(c, p, 0f, gy - 40f, w, K.H, ground[id % ground.size])
             }
         }
-        rect(c, p, 0f, gy - 40f, w, K.H, ground[id % ground.size])
         rect(c, p, 0f, gy - 40f, w, gy - 34f, 0x33000000)
     }
 }

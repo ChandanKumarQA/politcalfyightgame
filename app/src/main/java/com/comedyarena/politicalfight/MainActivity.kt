@@ -86,6 +86,7 @@ class MainActivity : Activity() {
             }
 
             addJavascriptInterface(WebAppInterface(this@MainActivity), "Android")
+            addJavascriptInterface(NativeBridge(this@MainActivity), "Native")
             val targetUrl = "file:///android_asset/game/index.html?autostart=1&p1=$p1&p2=$p2Resolved&stage=$arena&mode=$mode"
             loadUrl(targetUrl)
         }
@@ -110,9 +111,11 @@ class MainActivity : Activity() {
         super.onResume()
         applyImmersiveMode()
         webView.onResume()
+        webView.evaluateJavascript("window.onNativeResume && window.onNativeResume()", null)
     }
 
     override fun onPause() {
+        webView.evaluateJavascript("window.onNativePause && window.onNativePause()", null)
         webView.onPause()
         super.onPause()
     }
@@ -124,10 +127,37 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
+        webView.evaluateJavascript("if (window.onNativeBack) { window.onNativeBack(); } else { window.history.back(); }", null)
+    }
+
+    // --- JavaScript to Native Android Bridge (kursi3d Native interface) ---
+    class NativeBridge(private val activity: MainActivity) {
+        @JavascriptInterface
+        fun vibrate(ms: Long) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                    vm.defaultVibrator.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    val vib = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vib.vibrate(ms)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        @JavascriptInterface
+        fun quit() {
+            activity.runOnUiThread {
+                activity.finish()
+            }
         }
     }
 

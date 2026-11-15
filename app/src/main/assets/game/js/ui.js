@@ -470,6 +470,31 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   animate();
 
+  // --- Native Android Match Starter Bridge ---
+  window.initAndroidMatch = function(p1, p2, stage, mode, diff) {
+    SoundSystem.resume();
+    if (typeof p1 === "number" && p1 >= 0) selectedP1 = p1;
+    if (typeof p2 === "number" && p2 >= 0) selectedP2 = p2;
+    else selectedP2 = (selectedP1 + 1) % CharacterRoster.length;
+    if (typeof stage === "number" && stage >= 0) selectedStage = stage;
+    if (diff) selectedDiff = diff;
+    showScreen("fight");
+    engine.initMatch(selectedP1, selectedP2, selectedStage, mode || "cpu", selectedDiff);
+  };
+
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has("autostart") || urlParams.has("p1")) {
+      const p1 = parseInt(urlParams.get("p1") || "0");
+      const p2 = parseInt(urlParams.get("p2") || "1");
+      const stg = parseInt(urlParams.get("stage") || "0");
+      const md = urlParams.get("mode") || "cpu";
+      window.initAndroidMatch(p1, p2, stg, md);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+
   // Show Main Menu on Start
   showScreen("main-menu");
   document.body.classList.remove("loading-state");

@@ -56,21 +56,35 @@ class ArenaManager {
     floor.position.y = -0.25;
     group.add(floor);
 
-    // Center Gold Dais Ring
-    const ringGeom = new THREE.RingGeometry(4, 4.3, 32);
-    const goldMat = new THREE.MeshBasicMaterial({ color: 0xffd700, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(ringGeom, goldMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.02;
-    group.add(ring);
+    // Concentric Lotus Mandala Dais Rings (Royal Arena Center Dais)
+    const mandalaColors = [0xffd700, 0xe65100, 0x1565c0, 0xc2185b, 0xffb300];
+    const ringRadii = [[2, 2.8], [2.8, 3.8], [3.8, 5.0], [5.0, 6.4], [6.4, 7.8]];
+    ringRadii.forEach(([inner, outer], idx) => {
+      const mGeom = new THREE.RingGeometry(inner, outer, 36);
+      const mMat = new THREE.MeshBasicMaterial({ color: mandalaColors[idx % mandalaColors.length], side: THREE.DoubleSide });
+      const mMesh = new THREE.Mesh(mGeom, mMat);
+      mMesh.rotation.x = -Math.PI / 2;
+      mMesh.position.y = 0.01 + idx * 0.002;
+      group.add(mMesh);
+    });
 
-    // Inner Tri-color Center Motif
-    const tricolorGeom = new THREE.RingGeometry(8, 8.4, 32);
-    const greenMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
-    const greenRing = new THREE.Mesh(tricolorGeom, greenMat);
-    greenRing.rotation.x = -Math.PI / 2;
-    greenRing.position.y = 0.02;
-    group.add(greenRing);
+    // Circular Diya Oil Lamps around dais perimeter
+    const numDiyas = 20;
+    const diyaGeom = new THREE.CylinderGeometry(0.18, 0.12, 0.12, 10);
+    const diyaMat = new THREE.MeshLambertMaterial({ color: 0x8d6e63 });
+    const flameGeom = new THREE.ConeGeometry(0.08, 0.18, 8);
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa000 });
+    for (let i = 0; i < numDiyas; i++) {
+      const ang = (i / numDiyas) * Math.PI * 2;
+      const dx = Math.sin(ang) * 8.0;
+      const dz = Math.cos(ang) * 8.0;
+      const dMesh = new THREE.Mesh(diyaGeom, diyaMat);
+      dMesh.position.set(dx, 0.06, dz);
+      group.add(dMesh);
+      const fMesh = new THREE.Mesh(flameGeom, flameMat);
+      fMesh.position.set(dx, 0.18, dz);
+      group.add(fMesh);
+    }
 
     // Classical Semicircular Pillars in background
     const colGeom = new THREE.CylinderGeometry(0.55, 0.6, 9, 16);

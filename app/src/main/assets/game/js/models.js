@@ -9,6 +9,7 @@ const CharacterRoster = [
     title: "Balanced Power Fighter",
     party: "Team Vaada",
     avatar: "🧔🏻‍♂️",
+    faceTexture: "faces/face_mitraman_head.png",
     pwr: 80, spd: 70, def: 75,
     color: 0xff9933,
     skinColor: 0xdfa070,
@@ -28,6 +29,7 @@ const CharacterRoster = [
     title: "Agile Speed Striker",
     party: "Team Yatra",
     avatar: "🏃🏻",
+    faceTexture: "faces/face_yatraboy_head.png",
     pwr: 70, spd: 90, def: 65,
     color: 0x2e9bff,
     skinColor: 0xe8b88a,
@@ -47,6 +49,7 @@ const CharacterRoster = [
     title: "Kick Specialist",
     party: "Trina Sena",
     avatar: "🧕🏻",
+    faceTexture: "faces/face_deedee_head.png",
     pwr: 75, spd: 85, def: 65,
     color: 0x22b35e,
     skinColor: 0xd99b66,
@@ -66,6 +69,7 @@ const CharacterRoster = [
     title: "Heavyweight Brawler",
     party: "MAGA Morcha",
     avatar: "👱🏻‍♂️",
+    faceTexture: "faces/face_tarifftaau_head.png",
     pwr: 95, spd: 50, def: 85,
     color: 0xe0262f,
     skinColor: 0xf2b58d,
@@ -85,6 +89,7 @@ const CharacterRoster = [
     title: "Iron Defense Tank",
     party: "Bhagwa Front",
     avatar: "🧑🏻‍🦲",
+    faceTexture: "faces/face_dozerdada_head.png",
     pwr: 85, spd: 55, def: 95,
     color: 0xf05a00,
     skinColor: 0xdea070,
@@ -104,6 +109,7 @@ const CharacterRoster = [
     title: "Highway Tactician",
     party: "Gati Morcha",
     avatar: "👨🏻‍🦳",
+    faceTexture: "faces/face_tollman_head.png",
     pwr: 80, spd: 75, def: 75,
     color: 0xff9a1f,
     skinColor: 0xe2a878,
@@ -123,6 +129,7 @@ const CharacterRoster = [
     title: "Acrobatic Rusher",
     party: "Lal Paltan",
     avatar: "🧔🏽",
+    faceTexture: "faces/face_railraja_head.png",
     pwr: 75, spd: 80, def: 70,
     color: 0x16a34a,
     skinColor: 0xbc7e4c,
@@ -142,6 +149,7 @@ const CharacterRoster = [
     title: "Counter Specialist",
     party: "Chanakya Dal",
     avatar: "👨🏻‍🦲",
+    faceTexture: "faces/face_gharmantri_head.png",
     pwr: 85, spd: 65, def: 85,
     color: 0x90a4ae,
     skinColor: 0xdfa070,
@@ -161,6 +169,7 @@ const CharacterRoster = [
     title: "Combo Specialist",
     party: "Digital Sabha",
     avatar: "🧑🏻",
+    faceTexture: "faces/face_factbhai_head.png",
     pwr: 70, spd: 90, def: 70,
     color: 0x22d3ee,
     skinColor: 0xe8b88a,
@@ -177,23 +186,38 @@ const CharacterRoster = [
   {
     id: 9,
     name: "CHAI BOSS",
-    title: "The Final Power Boss",
-    party: "Royal Morcha",
+    title: "The Supreme Master",
+    party: "Ahimsa Front",
     avatar: "👑",
+    faceTexture: "faces/face_mbapu_head.png",
     pwr: 95, spd: 80, def: 90,
     color: 0xffd700,
     skinColor: 0xdca272,
     clothesColor: 0xfff8e1,
     vestColor: 0xff6f00,
     hairColor: 0xf5f5f5,
-    hat: "turban_gold",
-    glasses: false,
-    beard: "royal_white",
-    superName: "KADAK CHAI SPLASH",
-    superDesc: "A giant boiling brass kettle erupts with a volcano of spicy chai steam and cups!",
-    quote: "Only the strongest can handle the asli kadak swaad of power!"
+    hat: "round_glasses",
+    glasses: true,
+    beard: "mustache_white",
+    superName: "SATYAGRAHA SHOCK",
+    superDesc: "Supreme ancient combat shakti wave that reverberates through the entire arena!",
+    quote: "Truth and strength triumph over everything in this arena!"
   }
 ];
+
+// Texture Cache for 3D Faces
+const _faceTexCache = {};
+function getFaceTexture(url) {
+  if (!_faceTexCache[url]) {
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load(url);
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    _faceTexCache[url] = tex;
+  }
+  return _faceTexCache[url];
+}
 
 class FighterModel {
   constructor(charData, isP2 = false) {
@@ -224,9 +248,15 @@ class FighterModel {
     root.add(hips);
     this.bones.hips = hips;
 
-    const hipsGeom = new THREE.CylinderGeometry(0.38, 0.35, 0.45, 12);
+    const hipsGeom = new THREE.CylinderGeometry(0.40, 0.36, 0.45, 14);
     const hipsMesh = new THREE.Mesh(hipsGeom, clothesMat);
     hips.add(hipsMesh);
+
+    // Flared Indian Kurta Skirt / Drape (Hangs down over thighs to mid-thigh)
+    const skirtGeom = new THREE.CylinderGeometry(0.42, 0.62, 0.72, 16, 1, true);
+    const skirtMesh = new THREE.Mesh(skirtGeom, clothesMat);
+    skirtMesh.position.y = -0.28;
+    hips.add(skirtMesh);
 
     // Torso / Spine
     const torso = new THREE.Group();
@@ -240,10 +270,16 @@ class FighterModel {
     torso.add(torsoMesh);
 
     // Vest / Waistcoat overlay
-    const vestGeom = new THREE.BoxGeometry(0.88, 0.88, 0.58);
+    const vestGeom = new THREE.BoxGeometry(0.88, 0.92, 0.58);
     const vestMesh = new THREE.Mesh(vestGeom, vestMat);
     vestMesh.position.y = 0.48;
     torso.add(vestMesh);
+
+    // Mandarin / Nehru Collar
+    const collarGeom = new THREE.CylinderGeometry(0.24, 0.25, 0.16, 14);
+    const collarMesh = new THREE.Mesh(collarGeom, vestMat);
+    collarMesh.position.y = 0.98;
+    torso.add(collarMesh);
 
     // Neck & Head
     const neck = new THREE.Group();
@@ -255,72 +291,50 @@ class FighterModel {
     neck.add(head);
     this.bones.head = head;
 
-    const headGeom = new THREE.SphereGeometry(0.42, 16, 14);
+    // 3D Head Base
+    const headGeom = new THREE.CylinderGeometry(0.36, 0.32, 0.82, 16);
     const headMesh = new THREE.Mesh(headGeom, skinMat);
-    headMesh.position.y = 0.35;
+    headMesh.position.y = 0.40;
     head.add(headMesh);
 
-    // Cartoon Nose
-    const noseGeom = new THREE.SphereGeometry(0.1, 8, 8);
-    const noseMesh = new THREE.Mesh(noseGeom, skinMat);
-    noseMesh.position.set(0, 0.32, 0.42);
-    head.add(noseMesh);
-
-    // Eyes
-    const eyeGeom = new THREE.SphereGeometry(0.08, 8, 8);
-    const pupilGeom = new THREE.SphereGeometry(0.04, 8, 8);
-    const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-
-    [-0.14, 0.14].forEach(xOff => {
-      const eyeWhite = new THREE.Mesh(eyeGeom, whiteMat);
-      eyeWhite.position.set(xOff, 0.4, 0.38);
-      head.add(eyeWhite);
-
-      const pupil = new THREE.Mesh(pupilGeom, darkMat);
-      pupil.position.set(xOff, 0.4, 0.44);
-      head.add(pupil);
-    });
+    // Realistic Front Face Texture Decal (Authentic caricature likeness)
+    if (cd.faceTexture) {
+      const faceTex = getFaceTexture(cd.faceTexture);
+      const faceMat = new THREE.MeshLambertMaterial({
+        map: faceTex,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.74, 0.84), faceMat);
+      facePlane.position.set(0, 0.40, 0.35);
+      head.add(facePlane);
+    }
 
     // Spectacles / Glasses
     if (cd.glasses) {
-      const rimGeom = new THREE.TorusGeometry(0.12, 0.025, 8, 16);
+      const rimGeom = new THREE.TorusGeometry(0.12, 0.022, 8, 16);
       [-0.14, 0.14].forEach(xOff => {
         const rim = new THREE.Mesh(rimGeom, darkMat);
-        rim.position.set(xOff, 0.4, 0.41);
+        rim.position.set(xOff, 0.42, 0.38);
         head.add(rim);
       });
-      const bridgeGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6);
+      const bridgeGeom = new THREE.CylinderGeometry(0.018, 0.018, 0.1, 6);
       const bridge = new THREE.Mesh(bridgeGeom, darkMat);
       bridge.rotation.z = Math.PI / 2;
-      bridge.position.set(0, 0.4, 0.42);
+      bridge.position.set(0, 0.42, 0.39);
       head.add(bridge);
-    }
-
-    // Beard / Mustache
-    if (cd.beard === "full" || cd.beard === "royal_white") {
-      const beardGeom = new THREE.CylinderGeometry(0.32, 0.18, 0.35, 10);
-      const beardMat = (cd.beard === "royal_white") ? new THREE.MeshLambertMaterial({ color: 0xffffff }) : hairMat;
-      const beard = new THREE.Mesh(beardGeom, beardMat);
-      beard.position.set(0, 0.14, 0.3);
-      beard.rotation.x = 0.3;
-      head.add(beard);
-    } else if (cd.beard === "mustache_curly") {
-      const stacheGeom = new THREE.TorusGeometry(0.16, 0.04, 6, 12, Math.PI);
-      const stache = new THREE.Mesh(stacheGeom, darkMat);
-      stache.position.set(0, 0.24, 0.42);
-      stache.rotation.z = Math.PI;
-      head.add(stache);
     }
 
     // Hair / Hats
     if (cd.hat === "turban_gold") {
       const turbanGeom = new THREE.CylinderGeometry(0.52, 0.44, 0.4, 14);
       const turban = new THREE.Mesh(turbanGeom, goldMat);
-      turban.position.set(0, 0.65, 0.05);
+      turban.position.set(0, 0.72, 0.05);
       head.add(turban);
       const gemGeom = new THREE.SphereGeometry(0.08, 8, 8);
       const gem = new THREE.Mesh(gemGeom, new THREE.MeshLambertMaterial({ color: 0xff1744 }));
-      gem.position.set(0, 0.65, 0.46);
+      gem.position.set(0, 0.72, 0.46);
       head.add(gem);
     } else if (cd.hat === "gamchha") {
       const shawlGeom = new THREE.TorusGeometry(0.48, 0.12, 8, 16);
@@ -341,8 +355,9 @@ class FighterModel {
         head.add(cup);
       });
     } else if (cd.hat !== "bald") {
-      const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.44, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hairMat);
-      hairCap.position.y = 0.38;
+      const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), hairMat);
+      hairCap.position.set(0, 0.58, -0.06);
+      hairCap.rotation.x = -0.2;
       head.add(hairCap);
     }
 
@@ -406,10 +421,35 @@ class FighterModel {
       shinMesh.position.y = -0.32;
       knee.add(shinMesh);
 
-      // Foot / Shoe
-      const footMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.38), darkMat);
-      footMesh.position.set(0, -0.68, 0.08);
-      knee.add(footMesh);
+      // Churidar horizontal wrinkle rings
+      [-0.44, -0.50, -0.56].forEach(ry => {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.024, 6, 12), clothesMat);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = ry;
+        knee.add(ring);
+      });
+
+      // Traditional Indian Mojari / Peshawari Footwear
+      const shoeGroup = new THREE.Group();
+      shoeGroup.position.set(0, -0.68, 0.06);
+      knee.add(shoeGroup);
+
+      const shoeColor = (cd.id === 0) ? 0xf5f5f5 : (cd.id === 1) ? 0x5d4037 : 0x3e2723;
+      const shoeMat = new THREE.MeshLambertMaterial({ color: shoeColor });
+      const soleMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+
+      const soleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, 0.48), soleMat);
+      soleMesh.position.y = -0.06;
+      shoeGroup.add(soleMesh);
+
+      const shoeUpper = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.44), shoeMat);
+      shoeGroup.add(shoeUpper);
+
+      // Pointed upturned toe tip
+      const toeTip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.16, 8), shoeMat);
+      toeTip.rotation.x = Math.PI / 3;
+      toeTip.position.set(0, 0.04, 0.26);
+      shoeGroup.add(toeTip);
 
       if (side === -1) {
         this.bones.leftHip = hipJoint;

@@ -40,6 +40,12 @@ class MainActivity : Activity() {
         AdManager.init(this)
         AdManager.loadInterstitial(this)
 
+        val p1 = intent.getIntExtra("p1", 0)
+        val p2 = intent.getIntExtra("p2", -1)
+        val arena = intent.getIntExtra("arena", 0)
+        val mode = intent.getStringExtra("mode") ?: "quick"
+        val p2Resolved = if (p2 >= 0) p2 else (p1 + 1) % 10
+
         // Setup Hardware-Accelerated 3D WebGL WebView
         webView = WebView(this).apply {
             setBackgroundColor(android.graphics.Color.BLACK)
@@ -64,6 +70,11 @@ class MainActivity : Activity() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     applyImmersiveMode()
+                    val jsMode = if (mode == "online") "online" else "cpu"
+                    view?.evaluateJavascript(
+                        "if (window.initAndroidMatch) { window.initAndroidMatch($p1, $p2Resolved, $arena, '$jsMode'); }",
+                        null
+                    )
                 }
 
                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
@@ -75,7 +86,8 @@ class MainActivity : Activity() {
             }
 
             addJavascriptInterface(WebAppInterface(this@MainActivity), "Android")
-            loadUrl("file:///android_asset/game/index.html")
+            val targetUrl = "file:///android_asset/game/index.html?autostart=1&p1=$p1&p2=$p2Resolved&stage=$arena&mode=$mode"
+            loadUrl(targetUrl)
         }
 
         setContentView(webView)

@@ -166,13 +166,19 @@ class MenuActivity : Activity() {
     }
 
     private fun start(mode: String, p1: Int, p2: Int, level: Int, arena: Int = Prefs.stage) {
+        val i = Intent(this, MainActivity::class.java)
+        i.putExtra("mode", mode); i.putExtra("p1", p1); i.putExtra("p2", p2); i.putExtra("level", level); i.putExtra("arena", arena)
+        startActivity(i)
+    }
+
+    private fun startRetro(mode: String, p1: Int, p2: Int, level: Int, arena: Int = Prefs.stage) {
         val i = Intent(this, GameActivity::class.java)
         i.putExtra("mode", mode); i.putExtra("p1", p1); i.putExtra("p2", p2); i.putExtra("level", level); i.putExtra("arena", arena)
         startActivity(i)
     }
 
     private fun startOnlineMatch(code: String, p1Hero: Int, p2Hero: Int, stage: Int, isHost: Boolean) {
-        val i = Intent(this, GameActivity::class.java)
+        val i = Intent(this, MainActivity::class.java)
         i.putExtra("mode", "online")
         i.putExtra("p1", p1Hero)
         i.putExtra("p2", p2Hero)
@@ -250,6 +256,9 @@ class MenuActivity : Activity() {
         }
         add("🏆  STORY MODE (500 LEVELS)", 0xFFEF6C00.toInt()) {
             charSelect("CHOOSE YOUR FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; showLevels() }
+        }
+        add("🕹️  CLASSIC 2D RETRO ARENA", 0xFF546E7A.toInt()) {
+            charSelect("CHOOSE 2D FIGHTER", Prefs.hero) { h, stg -> Prefs.hero = h; Prefs.stage = stg; startRetro("quick", h, -1, 1, stg) }
         }
         add("🥋  CHARACTER COLLECTION", 0xFF6D4C41.toInt()) {
             charSelect("CHARACTER COLLECTION", Prefs.hero) { h, _ -> Prefs.hero = h; showHome() }

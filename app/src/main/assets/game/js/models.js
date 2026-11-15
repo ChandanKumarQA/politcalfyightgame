@@ -9,7 +9,6 @@ const CharacterRoster = [
     title: "Balanced Power Fighter",
     party: "Team Vaada",
     avatar: "🧔🏻‍♂️",
-    faceTexture: "faces/face_mitraman_head.png",
     pwr: 80, spd: 70, def: 75,
     color: 0xff9933,
     skinColor: 0xdfa070,
@@ -29,7 +28,6 @@ const CharacterRoster = [
     title: "Agile Speed Striker",
     party: "Team Yatra",
     avatar: "🏃🏻",
-    faceTexture: "faces/face_yatraboy_head.png",
     pwr: 70, spd: 90, def: 65,
     color: 0x2e9bff,
     skinColor: 0xe8b88a,
@@ -49,7 +47,6 @@ const CharacterRoster = [
     title: "Kick Specialist",
     party: "Trina Sena",
     avatar: "🧕🏻",
-    faceTexture: "faces/face_deedee_head.png",
     pwr: 75, spd: 85, def: 65,
     color: 0x22b35e,
     skinColor: 0xd99b66,
@@ -69,7 +66,6 @@ const CharacterRoster = [
     title: "Heavyweight Brawler",
     party: "MAGA Morcha",
     avatar: "👱🏻‍♂️",
-    faceTexture: "faces/face_tarifftaau_head.png",
     pwr: 95, spd: 50, def: 85,
     color: 0xe0262f,
     skinColor: 0xf2b58d,
@@ -89,7 +85,6 @@ const CharacterRoster = [
     title: "Iron Defense Tank",
     party: "Bhagwa Front",
     avatar: "🧑🏻‍🦲",
-    faceTexture: "faces/face_dozerdada_head.png",
     pwr: 85, spd: 55, def: 95,
     color: 0xf05a00,
     skinColor: 0xdea070,
@@ -109,7 +104,6 @@ const CharacterRoster = [
     title: "Highway Tactician",
     party: "Gati Morcha",
     avatar: "👨🏻‍🦳",
-    faceTexture: "faces/face_tollman_head.png",
     pwr: 80, spd: 75, def: 75,
     color: 0xff9a1f,
     skinColor: 0xe2a878,
@@ -129,7 +123,6 @@ const CharacterRoster = [
     title: "Acrobatic Rusher",
     party: "Lal Paltan",
     avatar: "🧔🏽",
-    faceTexture: "faces/face_railraja_head.png",
     pwr: 75, spd: 80, def: 70,
     color: 0x16a34a,
     skinColor: 0xbc7e4c,
@@ -149,7 +142,6 @@ const CharacterRoster = [
     title: "Counter Specialist",
     party: "Chanakya Dal",
     avatar: "👨🏻‍🦲",
-    faceTexture: "faces/face_gharmantri_head.png",
     pwr: 85, spd: 65, def: 85,
     color: 0x90a4ae,
     skinColor: 0xdfa070,
@@ -169,7 +161,6 @@ const CharacterRoster = [
     title: "Combo Specialist",
     party: "Digital Sabha",
     avatar: "🧑🏻",
-    faceTexture: "faces/face_factbhai_head.png",
     pwr: 70, spd: 90, def: 70,
     color: 0x22d3ee,
     skinColor: 0xe8b88a,
@@ -189,7 +180,6 @@ const CharacterRoster = [
     title: "The Supreme Master",
     party: "Ahimsa Front",
     avatar: "👑",
-    faceTexture: "faces/face_mbapu_head.png",
     pwr: 95, spd: 80, def: 90,
     color: 0xffd700,
     skinColor: 0xdca272,
@@ -204,20 +194,6 @@ const CharacterRoster = [
     quote: "Truth and strength triumph over everything in this arena!"
   }
 ];
-
-// Texture Cache for 3D Faces
-const _faceTexCache = {};
-function getFaceTexture(url) {
-  if (!_faceTexCache[url]) {
-    const loader = new THREE.TextureLoader();
-    const tex = loader.load(url);
-    tex.generateMipmaps = true;
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    _faceTexCache[url] = tex;
-  }
-  return _faceTexCache[url];
-}
 
 class FighterModel {
   constructor(charData, isP2 = false) {
@@ -291,75 +267,8 @@ class FighterModel {
     neck.add(head);
     this.bones.head = head;
 
-    // 3D Head Base
-    const headGeom = new THREE.CylinderGeometry(0.36, 0.32, 0.82, 16);
-    const headMesh = new THREE.Mesh(headGeom, skinMat);
-    headMesh.position.y = 0.40;
-    head.add(headMesh);
-
-    // Realistic Front Face Texture Decal (Authentic caricature likeness)
-    if (cd.faceTexture) {
-      const faceTex = getFaceTexture(cd.faceTexture);
-      const faceMat = new THREE.MeshLambertMaterial({
-        map: faceTex,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthWrite: false
-      });
-      const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.74, 0.84), faceMat);
-      facePlane.position.set(0, 0.40, 0.35);
-      head.add(facePlane);
-    }
-
-    // Spectacles / Glasses
-    if (cd.glasses) {
-      const rimGeom = new THREE.TorusGeometry(0.12, 0.022, 8, 16);
-      [-0.14, 0.14].forEach(xOff => {
-        const rim = new THREE.Mesh(rimGeom, darkMat);
-        rim.position.set(xOff, 0.42, 0.38);
-        head.add(rim);
-      });
-      const bridgeGeom = new THREE.CylinderGeometry(0.018, 0.018, 0.1, 6);
-      const bridge = new THREE.Mesh(bridgeGeom, darkMat);
-      bridge.rotation.z = Math.PI / 2;
-      bridge.position.set(0, 0.42, 0.39);
-      head.add(bridge);
-    }
-
-    // Hair / Hats
-    if (cd.hat === "turban_gold") {
-      const turbanGeom = new THREE.CylinderGeometry(0.52, 0.44, 0.4, 14);
-      const turban = new THREE.Mesh(turbanGeom, goldMat);
-      turban.position.set(0, 0.72, 0.05);
-      head.add(turban);
-      const gemGeom = new THREE.SphereGeometry(0.08, 8, 8);
-      const gem = new THREE.Mesh(gemGeom, new THREE.MeshLambertMaterial({ color: 0xff1744 }));
-      gem.position.set(0, 0.72, 0.46);
-      head.add(gem);
-    } else if (cd.hat === "gamchha") {
-      const shawlGeom = new THREE.TorusGeometry(0.48, 0.12, 8, 16);
-      const gamchhaMat = new THREE.MeshLambertMaterial({ color: 0xd50000 });
-      const shawl = new THREE.Mesh(shawlGeom, gamchhaMat);
-      shawl.position.set(0, 0.05, 0);
-      shawl.rotation.x = Math.PI / 3;
-      torso.add(shawl);
-    } else if (cd.hat === "headphones") {
-      const bandGeom = new THREE.TorusGeometry(0.44, 0.04, 8, 16, Math.PI);
-      const band = new THREE.Mesh(bandGeom, darkMat);
-      band.position.set(0, 0.4, 0);
-      head.add(band);
-      [-0.42, 0.42].forEach(x => {
-        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.1, 10), darkMat);
-        cup.rotation.z = Math.PI / 2;
-        cup.position.set(x, 0.38, 0);
-        head.add(cup);
-      });
-    } else if (cd.hat !== "bald") {
-      const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), hairMat);
-      hairCap.position.set(0, 0.58, -0.06);
-      hairCap.rotation.x = -0.2;
-      head.add(hairCap);
-    }
+    // 100% Procedural 3D Caricature Head & Face Sculpting (Pure 3D meshes, 0% image textures)
+    this.buildProceduralHead(head, torso, cd, skinMat, hairMat, darkMat, goldMat, clothesMat, vestMat);
 
     // --- ARMS & SHOULDERS ---
     [-1, 1].forEach(side => {
@@ -461,6 +370,545 @@ class FighterModel {
         this.bones.rightKnee = knee;
       }
     });
+  }
+
+  // 100% Procedural 3D Head Sculptor (Zero Image Textures, pure Three.js meshes)
+  buildProceduralHead(head, torso, cd, skinMat, hairMat, darkMat, goldMat, clothesMat, vestMat) {
+    const whiteMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const pupilMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const lipMat = new THREE.MeshLambertMaterial({ color: 0xc87565 });
+    const redMat = new THREE.MeshLambertMaterial({ color: 0xd50000 });
+    const saffronMat = new THREE.MeshLambertMaterial({ color: 0xff6d00 });
+    const silverWireMat = new THREE.MeshLambertMaterial({ color: 0xb0bec5 });
+    const whiteHairMat = new THREE.MeshLambertMaterial({ color: 0xf5f5f5 });
+    const greyHairMat = new THREE.MeshLambertMaterial({ color: 0x757575 });
+    const darkHairMat = new THREE.MeshLambertMaterial({ color: 0x212121 });
+    const blondeHairMat = new THREE.MeshLambertMaterial({ color: 0xf9cb60 });
+
+    // 1. Skull / Cranium (Curved 3D Head Dome)
+    const craniumGeom = new THREE.SphereGeometry(0.38, 16, 14);
+    const cranium = new THREE.Mesh(craniumGeom, skinMat);
+    cranium.position.set(0, 0.44, 0.0);
+    cranium.scale.set(0.96, 1.10, 1.02);
+    head.add(cranium);
+
+    // 2. Jaw & Chin (Sculpted lower facial structure)
+    const jawGeom = new THREE.CylinderGeometry(0.34, 0.24, 0.36, 12);
+    const jaw = new THREE.Mesh(jawGeom, skinMat);
+    jaw.position.set(0, 0.18, 0.05);
+    head.add(jaw);
+
+    const chinGeom = new THREE.SphereGeometry(0.13, 10, 8);
+    const chin = new THREE.Mesh(chinGeom, skinMat);
+    chin.position.set(0, 0.06, 0.18);
+    chin.scale.set(1.0, 0.8, 1.0);
+    head.add(chin);
+
+    // 3. Cheekbones (Volumetric facial contours for 3D depth)
+    [-0.20, 0.20].forEach(x => {
+      const cheekGeom = new THREE.SphereGeometry(0.12, 10, 8);
+      const cheek = new THREE.Mesh(cheekGeom, skinMat);
+      cheek.position.set(x, 0.28, 0.20);
+      cheek.scale.set(0.9, 0.8, 1.1);
+      head.add(cheek);
+    });
+
+    // 4. Brow Ridge (Forehead shelf above eyes)
+    const browRidgeGeom = new THREE.CylinderGeometry(0.045, 0.045, 0.46, 8);
+    const browRidge = new THREE.Mesh(browRidgeGeom, skinMat);
+    browRidge.rotation.z = Math.PI / 2;
+    browRidge.position.set(0, 0.45, 0.28);
+    browRidge.scale.set(1.0, 0.8, 1.0);
+    head.add(browRidge);
+
+    // 5. 3D Eyes (Sclera + Pupil + Specular Highlight Glint + Eyelid fold)
+    [-0.13, 0.13].forEach(x => {
+      // Eyeball
+      const eyeGeom = new THREE.SphereGeometry(0.075, 12, 10);
+      const eyeball = new THREE.Mesh(eyeGeom, whiteMat);
+      eyeball.position.set(x, 0.38, 0.27);
+      head.add(eyeball);
+
+      // Pupil
+      const pupilGeom = new THREE.SphereGeometry(0.040, 8, 8);
+      const pupil = new THREE.Mesh(pupilGeom, pupilMat);
+      pupil.position.set(x, 0.38, 0.33);
+      pupil.scale.set(1.0, 1.0, 0.4);
+      head.add(pupil);
+
+      // Specular highlight glint
+      const glintGeom = new THREE.SphereGeometry(0.013, 6, 6);
+      const glint = new THREE.Mesh(glintGeom, whiteMat);
+      glint.position.set(x + 0.015, 0.395, 0.355);
+      head.add(glint);
+
+      // Eyelid crease
+      const lidGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.14, 6);
+      const lid = new THREE.Mesh(lidGeom, skinMat);
+      lid.rotation.z = Math.PI / 2;
+      lid.position.set(x, 0.44, 0.31);
+      head.add(lid);
+    });
+
+    // 6. 3D Sculpted Nose (Bridge + Bulb Tip + Nostril Wings)
+    const noseBridgeGeom = new THREE.CylinderGeometry(0.032, 0.050, 0.16, 8);
+    const noseBridge = new THREE.Mesh(noseBridgeGeom, skinMat);
+    noseBridge.position.set(0, 0.32, 0.34);
+    noseBridge.rotation.x = -0.18;
+    head.add(noseBridge);
+
+    const noseTipGeom = new THREE.SphereGeometry(0.062, 10, 10);
+    const noseTip = new THREE.Mesh(noseTipGeom, skinMat);
+    noseTip.position.set(0, 0.23, 0.38);
+    noseTip.scale.set(1.0, 0.9, 1.1);
+    head.add(noseTip);
+
+    [-0.055, 0.055].forEach(nx => {
+      const wingGeom = new THREE.SphereGeometry(0.035, 8, 8);
+      const wing = new THREE.Mesh(wingGeom, skinMat);
+      wing.position.set(nx, 0.22, 0.35);
+      head.add(wing);
+    });
+
+    // 7. 3D Lips & Mouth
+    const upperLipGeom = new THREE.CylinderGeometry(0.022, 0.022, 0.16, 8);
+    const upperLip = new THREE.Mesh(upperLipGeom, lipMat);
+    upperLip.rotation.z = Math.PI / 2;
+    upperLip.position.set(0, 0.155, 0.31);
+    head.add(upperLip);
+
+    const lowerLipGeom = new THREE.SphereGeometry(0.045, 8, 8);
+    const lowerLip = new THREE.Mesh(lowerLipGeom, lipMat);
+    lowerLip.position.set(0, 0.125, 0.30);
+    lowerLip.scale.set(1.6, 0.65, 0.8);
+    head.add(lowerLip);
+
+    // 8. 3D Ears with Helix & Lobe
+    [-0.37, 0.37].forEach((ex, eIdx) => {
+      const earHelixGeom = new THREE.TorusGeometry(0.075, 0.022, 6, 12, Math.PI * 1.2);
+      const earHelix = new THREE.Mesh(earHelixGeom, skinMat);
+      earHelix.rotation.y = (eIdx === 0 ? -1 : 1) * Math.PI / 2;
+      earHelix.rotation.x = -0.2;
+      earHelix.position.set(ex, 0.34, 0.02);
+      head.add(earHelix);
+
+      const lobeGeom = new THREE.SphereGeometry(0.04, 6, 6);
+      const lobe = new THREE.Mesh(lobeGeom, skinMat);
+      lobe.position.set(ex * 0.95, 0.28, 0.02);
+      head.add(lobe);
+    });
+
+    // --- CHARACTER-SPECIFIC 3D SCULPTING (0% IMAGES, 100% 3D MESHES) ---
+    switch(cd.id) {
+      case 0: { // MITRA MAN
+        // Bushy white eyebrows
+        [-0.13, 0.13].forEach(x => {
+          const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.15, 6), whiteHairMat);
+          brow.rotation.z = Math.PI / 2 + (x > 0 ? -0.15 : 0.15);
+          brow.position.set(x, 0.46, 0.32);
+          head.add(brow);
+        });
+
+        // Combed white hair cap with side volume
+        const hairCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.40, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
+          whiteHairMat
+        );
+        hairCap.position.set(0, 0.54, -0.04);
+        hairCap.rotation.x = -0.15;
+        head.add(hairCap);
+
+        // Side white hair puffs above ears
+        [-0.32, 0.32].forEach(hx => {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), whiteHairMat);
+          puff.position.set(hx, 0.42, -0.06);
+          puff.scale.set(0.9, 1.2, 1.3);
+          head.add(puff);
+        });
+        const backHair = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), whiteHairMat);
+        backHair.position.set(0, 0.38, -0.26);
+        backHair.scale.set(1.2, 1.2, 0.8);
+        head.add(backHair);
+
+        // Full sculpted white beard wrapping jawline
+        const jawBeard = new THREE.Mesh(
+          new THREE.TorusGeometry(0.30, 0.09, 8, 16, Math.PI),
+          whiteHairMat
+        );
+        jawBeard.rotation.x = Math.PI / 2 + 0.35;
+        jawBeard.position.set(0, 0.16, 0.10);
+        head.add(jawBeard);
+
+        // White chin beard block
+        const chinBeard = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), whiteHairMat);
+        chinBeard.position.set(0, 0.05, 0.22);
+        chinBeard.scale.set(1.2, 1.0, 1.0);
+        head.add(chinBeard);
+
+        // White curved mustache
+        const stache = new THREE.Mesh(
+          new THREE.TorusGeometry(0.12, 0.042, 8, 14, Math.PI * 0.8),
+          whiteHairMat
+        );
+        stache.rotation.z = -Math.PI * 0.1;
+        stache.rotation.x = 0.3;
+        stache.position.set(0, 0.18, 0.35);
+        head.add(stache);
+
+        // Rectangular silver wireframe spectacles
+        [-0.13, 0.13].forEach(gx => {
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.015, 6, 14), silverWireMat);
+          rim.position.set(gx, 0.39, 0.36);
+          head.add(rim);
+        });
+        const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6), silverWireMat);
+        bridge.rotation.z = Math.PI / 2;
+        bridge.position.set(0, 0.39, 0.37);
+        head.add(bridge);
+        [-0.23, 0.23].forEach(tx => {
+          const temple = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.32, 6), silverWireMat);
+          temple.rotation.x = Math.PI / 2;
+          temple.position.set(tx, 0.39, 0.18);
+          head.add(temple);
+        });
+        break;
+      }
+
+      case 1: { // YATRA BOY
+        // Dark thick youthful eyebrows
+        [-0.13, 0.13].forEach(x => {
+          const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.16, 6), darkHairMat);
+          brow.rotation.z = Math.PI / 2 + (x > 0 ? -0.1 : 0.1);
+          brow.position.set(x, 0.46, 0.32);
+          head.add(brow);
+        });
+
+        // Wavy dark hair dome
+        const hairMop = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 14), darkHairMat);
+        hairMop.position.set(0, 0.52, -0.02);
+        hairMop.scale.set(1.02, 1.05, 1.05);
+        head.add(hairMop);
+
+        // Swept front hair locks across forehead
+        [[-0.12, 0.50, 0.32, 0.2], [-0.02, 0.49, 0.34, 0.1], [0.09, 0.48, 0.33, -0.15]].forEach(([lx, ly, lz, rot]) => {
+          const lock = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.20, 6), darkHairMat);
+          lock.rotation.z = Math.PI + rot;
+          lock.rotation.x = -0.3;
+          lock.position.set(lx, ly, lz);
+          head.add(lock);
+        });
+
+        // Scruffy dark beard wrapping jaw and chin
+        const beardWrap = new THREE.Mesh(
+          new THREE.TorusGeometry(0.28, 0.07, 8, 14, Math.PI),
+          darkHairMat
+        );
+        beardWrap.rotation.x = Math.PI / 2 + 0.32;
+        beardWrap.position.set(0, 0.16, 0.10);
+        head.add(beardWrap);
+
+        const chinBeard = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), darkHairMat);
+        chinBeard.position.set(0, 0.05, 0.21);
+        chinBeard.scale.set(1.1, 0.9, 0.9);
+        head.add(chinBeard);
+
+        const mustache = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.18, 6), darkHairMat);
+        mustache.rotation.z = Math.PI / 2;
+        mustache.position.set(0, 0.185, 0.34);
+        head.add(mustache);
+        break;
+      }
+
+      case 2: { // DEEDEE QUEEN
+        // Dark parted hair peeking under saree
+        const frontHair = new THREE.Mesh(new THREE.SphereGeometry(0.39, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.45), darkHairMat);
+        frontHair.position.set(0, 0.52, -0.02);
+        head.add(frontHair);
+
+        // White Saree Pallu / Cloth Hood framing the head
+        const sareeHood = new THREE.Mesh(
+          new THREE.SphereGeometry(0.46, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.72),
+          whiteMat
+        );
+        sareeHood.position.set(0, 0.46, -0.02);
+        sareeHood.rotation.x = -0.15;
+        head.add(sareeHood);
+
+        // Saree green border trim around opening
+        const greenBorderMat = new THREE.MeshLambertMaterial({ color: 0x2e7d32 });
+        const sareeTrim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.43, 0.026, 8, 24, Math.PI * 1.3),
+          greenBorderMat
+        );
+        sareeTrim.rotation.z = -Math.PI * 0.15;
+        sareeTrim.rotation.x = 0.4;
+        sareeTrim.position.set(0, 0.42, 0.18);
+        head.add(sareeTrim);
+
+        // Red Bindi at center of forehead
+        const bindi = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 10), redMat);
+        bindi.position.set(0, 0.44, 0.33);
+        bindi.scale.set(1.0, 1.0, 0.4);
+        head.add(bindi);
+
+        // Dark spectacles
+        [-0.13, 0.13].forEach(gx => {
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.016, 6, 14), darkMat);
+          rim.position.set(gx, 0.38, 0.36);
+          head.add(rim);
+        });
+        const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6), darkMat);
+        bridge.rotation.z = Math.PI / 2;
+        bridge.position.set(0, 0.38, 0.37);
+        head.add(bridge);
+
+        // Low chignon / hair bun behind neck
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), darkHairMat);
+        bun.position.set(0, 0.20, -0.32);
+        head.add(bun);
+        break;
+      }
+
+      case 3: { // TARIFF TAU
+        // Intense bushy golden eyebrows
+        [-0.13, 0.13].forEach(x => {
+          const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.18, 6), blondeHairMat);
+          brow.rotation.z = Math.PI / 2 + (x > 0 ? -0.25 : 0.25);
+          brow.position.set(x, 0.47, 0.33);
+          head.add(brow);
+        });
+
+        // Iconic golden swept-over quiff hair pompadour
+        const quiff = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.58, 10), blondeHairMat);
+        quiff.rotation.z = -Math.PI / 3;
+        quiff.rotation.x = 0.4;
+        quiff.position.set(0.08, 0.66, 0.14);
+        head.add(quiff);
+
+        const quiffBase = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), blondeHairMat);
+        quiffBase.position.set(0, 0.54, -0.04);
+        quiffBase.scale.set(1.05, 1.15, 1.05);
+        head.add(quiffBase);
+
+        // Red silk necktie hanging from collar across torso
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.75, 0.06), redMat);
+        tie.position.set(0, 0.45, 0.32);
+        torso.add(tie);
+        break;
+      }
+
+      case 4: { // DOZER DADA
+        // Sacred 3D Tilak on forehead
+        const tilakRed = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.025), redMat);
+        tilakRed.position.set(0, 0.44, 0.33);
+        head.add(tilakRed);
+
+        const tilakChandan = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.04, 0.02), saffronMat);
+        tilakChandan.position.set(0, 0.39, 0.33);
+        head.add(tilakChandan);
+
+        // Sharp dark angled eyebrows
+        [-0.13, 0.13].forEach(x => {
+          const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.16, 6), darkHairMat);
+          brow.rotation.z = Math.PI / 2 + (x > 0 ? -0.2 : 0.2);
+          brow.position.set(x, 0.46, 0.32);
+          head.add(brow);
+        });
+
+        // Gold hoop Kundal earring in right ear
+        const earring = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.014, 8, 14), goldMat);
+        earring.position.set(0.36, 0.26, 0.02);
+        head.add(earring);
+        break;
+      }
+
+      case 5: { // TOLL MASTER
+        // Salt-and-pepper cropped side-parted hair
+        const greyHairCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.41, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
+          greyHairMat
+        );
+        greyHairCap.position.set(0, 0.52, -0.04);
+        greyHairCap.rotation.x = -0.15;
+        head.add(greyHairCap);
+
+        // Neat grey mustache
+        const tollMustache = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.20, 6), greyHairMat);
+        tollMustache.rotation.z = Math.PI / 2;
+        tollMustache.position.set(0, 0.19, 0.35);
+        head.add(tollMustache);
+
+        // Wireframe spectacles
+        [-0.13, 0.13].forEach(gx => {
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.015, 6, 14), darkMat);
+          rim.position.set(gx, 0.38, 0.36);
+          head.add(rim);
+        });
+        const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6), darkMat);
+        bridge.rotation.z = Math.PI / 2;
+        bridge.position.set(0, 0.38, 0.37);
+        head.add(bridge);
+        break;
+      }
+
+      case 6: { // RAIL RAJA
+        // Iconic twirled upturned handlebar mustache tips
+        [-0.11, 0.11].forEach((mx, mIdx) => {
+          const tip = new THREE.Mesh(
+            new THREE.TorusGeometry(0.085, 0.032, 8, 14, Math.PI * 0.9),
+            darkHairMat
+          );
+          tip.rotation.z = mIdx === 0 ? 0.3 : -0.3;
+          tip.rotation.y = mIdx === 0 ? -0.4 : 0.4;
+          tip.position.set(mx, 0.18, 0.35);
+          head.add(tip);
+        });
+
+        // Grey side hair tufts
+        [-0.34, 0.34].forEach(sx => {
+          const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), greyHairMat);
+          tuft.position.set(sx, 0.38, -0.08);
+          head.add(tuft);
+        });
+
+        // Round silver spectacles
+        [-0.13, 0.13].forEach(gx => {
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.015, 8, 14), silverWireMat);
+          rim.position.set(gx, 0.38, 0.36);
+          head.add(rim);
+        });
+        const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6), silverWireMat);
+        bridge.rotation.z = Math.PI / 2;
+        bridge.position.set(0, 0.38, 0.37);
+        head.add(bridge);
+
+        // Desi gamchha scarf draped across shoulders on torso
+        const shawlGeom = new THREE.TorusGeometry(0.48, 0.12, 8, 16);
+        const gamchhaMat = new THREE.MeshLambertMaterial({ color: 0xd50000 });
+        const shawl = new THREE.Mesh(shawlGeom, gamchhaMat);
+        shawl.position.set(0, 0.65, 0);
+        shawl.rotation.x = Math.PI / 3;
+        torso.add(shawl);
+        break;
+      }
+
+      case 7: { // GHAR MANTRI
+        // High receding bald forehead with salt-and-pepper fringe around sides and back
+        const fringe = new THREE.Mesh(
+          new THREE.TorusGeometry(0.38, 0.10, 8, 16, Math.PI * 1.2),
+          greyHairMat
+        );
+        fringe.rotation.x = Math.PI / 2 + 0.2;
+        fringe.position.set(0, 0.36, -0.10);
+        head.add(fringe);
+
+        // Full dense grey/white beard
+        const fullBeard = new THREE.Mesh(
+          new THREE.TorusGeometry(0.31, 0.09, 8, 16, Math.PI),
+          greyHairMat
+        );
+        fullBeard.rotation.x = Math.PI / 2 + 0.35;
+        fullBeard.position.set(0, 0.16, 0.10);
+        head.add(fullBeard);
+
+        const chinBeard = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), greyHairMat);
+        chinBeard.position.set(0, 0.05, 0.22);
+        chinBeard.scale.set(1.2, 1.0, 1.0);
+        head.add(chinBeard);
+
+        const mustache = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 6), greyHairMat);
+        mustache.rotation.z = Math.PI / 2;
+        mustache.position.set(0, 0.18, 0.35);
+        head.add(mustache);
+
+        // Heavy dark rectangular spectacles
+        [-0.13, 0.13].forEach(gx => {
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 6, 14), darkMat);
+          rim.position.set(gx, 0.38, 0.36);
+          head.add(rim);
+        });
+        const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.08, 6), darkMat);
+        bridge.rotation.z = Math.PI / 2;
+        bridge.position.set(0, 0.38, 0.37);
+        head.add(bridge);
+        break;
+      }
+
+      case 8: { // FACT BHAI
+        // Modern dark high-fade pompadour
+        const pompadour = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.24, 0.44), darkHairMat);
+        pompadour.position.set(0, 0.62, 0.02);
+        pompadour.rotation.x = -0.15;
+        head.add(pompadour);
+
+        const hairBase = new THREE.Mesh(new THREE.SphereGeometry(0.40, 14, 12), darkHairMat);
+        hairBase.position.set(0, 0.50, -0.04);
+        head.add(hairBase);
+
+        // Jaw stubble
+        const stubble = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.18, 6), darkHairMat);
+        stubble.rotation.z = Math.PI / 2;
+        stubble.position.set(0, 0.18, 0.34);
+        head.add(stubble);
+
+        // Studio over-ear DJ headphones
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.04, 8, 16, Math.PI), darkMat);
+        band.position.set(0, 0.42, 0);
+        head.add(band);
+        [-0.42, 0.42].forEach(hx => {
+          const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.1, 10), silverWireMat);
+          cup.rotation.z = Math.PI / 2;
+          cup.position.set(hx, 0.36, 0);
+          head.add(cup);
+        });
+        break;
+      }
+
+      case 9: { // CHAI BOSS (MBAPU)
+        // Prominent rounded ears
+        [-0.39, 0.39].forEach((ex, eIdx) => {
+          const bigEar = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.024, 6, 12, Math.PI * 1.3), skinMat);
+          bigEar.rotation.y = (eIdx === 0 ? -1 : 1) * Math.PI / 2;
+          bigEar.rotation.x = -0.1;
+          bigEar.position.set(ex, 0.36, 0.02);
+          head.add(bigEar);
+        });
+
+        // Drooping white grandfatherly mustache
+        const droopMustache = new THREE.Mesh(
+          new THREE.TorusGeometry(0.11, 0.035, 8, 14, Math.PI * 0.7),
+          whiteHairMat
+        );
+        droopMustache.rotation.z = -Math.PI * 0.15;
+        droopMustache.rotation.x = 0.4;
+        droopMustache.position.set(0, 0.19, 0.34);
+        head.add(droopMustache);
+
+        // Round nickel wire spectacles
+        [-0.13, 0.13].forEach(gx => {
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.014, 12, 16), silverWireMat);
+          rim.position.set(gx, 0.38, 0.36);
+          head.add(rim);
+        });
+        const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6), silverWireMat);
+        bridge.rotation.z = Math.PI / 2;
+        bridge.position.set(0, 0.38, 0.37);
+        head.add(bridge);
+        break;
+      }
+
+      default: {
+        // Fallback generic 3D hair
+        const fallbackHair = new THREE.Mesh(
+          new THREE.SphereGeometry(0.42, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.58),
+          hairMat
+        );
+        fallbackHair.position.set(0, 0.54, -0.06);
+        fallbackHair.rotation.x = -0.2;
+        head.add(fallbackHair);
+        break;
+      }
+    }
   }
 
   // --- Procedural Skeletal Animation Blender ---

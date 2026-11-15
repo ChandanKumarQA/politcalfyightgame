@@ -465,6 +465,16 @@ window.addEventListener("DOMContentLoaded", () => {
     const dt = Math.min(0.1, (now - lastTime) / 1000);
     lastTime = now;
 
+    // Continuous keyboard walking support
+    if (currentScreen === "fight" && engine.matchActive && !engine.paused) {
+      if (keys["a"]) engine.p1?.triggerAction("LEFT");
+      if (keys["d"]) engine.p1?.triggerAction("RIGHT");
+      if (engine.p2 && engine.gameMode === "local_2p") {
+        if (keys["arrowleft"]) engine.p2.triggerAction("LEFT");
+        if (keys["arrowright"]) engine.p2.triggerAction("RIGHT");
+      }
+    }
+
     engine.update(dt);
     renderer.render(scene, camera);
   }

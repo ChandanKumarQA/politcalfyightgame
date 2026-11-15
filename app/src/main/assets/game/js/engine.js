@@ -429,8 +429,15 @@ class FighterEntity {
       this.vx *= 0.82;
     }
 
-    // Arena Boundaries
-    this.x = Math.max(-13, Math.min(13, this.x));
+    // Auto transition walking to IDLE when movement stops
+    if (this.onGround && !this.isAttacking && this.state !== "BLOCK" && this.state !== "CROUCH" && this.state !== "KNOCKDOWN" && this.state !== "GETUP") {
+      if (Math.abs(this.vx) < 0.3) {
+        this.state = "IDLE";
+      }
+    }
+
+    // Arena Boundaries (Kept within central fighting dais)
+    this.x = Math.max(-8.5, Math.min(8.5, this.x));
 
     // Auto Face Opponent when grounded and not attacking
     if (this.opponent && this.onGround && !this.isAttacking && this.state !== "KNOCKDOWN" && this.state !== "GETUP") {
@@ -439,7 +446,8 @@ class FighterEntity {
 
     // Sync 3D Mesh
     this.model.group.position.set(this.x, this.y, 0);
-    this.model.group.rotation.y = this.facing > 0 ? 0 : Math.PI;
+    // Face each other in dynamic 3/4 3D fighting stance towards the camera
+    this.model.group.rotation.y = this.facing > 0 ? (Math.PI * 0.42) : (-Math.PI * 0.42);
 
     // Update Bone Animation Pose
     const progress = this.stateDuration > 0 ? Math.min(1, this.stateTimer / this.stateDuration) : 0;
@@ -489,6 +497,13 @@ class FighterEntity {
         this.state = "BLOCK";
         this.stateDuration = 0.4;
         this.stateTimer = 0;
+        this.vx = 0;
+        break;
+      case "CROUCH":
+        this.state = "CROUCH";
+        this.stateDuration = 0.4;
+        this.stateTimer = 0;
+        this.vx = 0;
         break;
       case "JUMP":
         if (this.onGround) {
@@ -506,11 +521,11 @@ class FighterEntity {
         }
         break;
       case "LEFT":
-        this.vx = (this.facing > 0 ? -1 : 1) * 4.2;
-        this.state = this.facing > 0 ? "WALK_BACK" : "WALK_FWD";
+        this.vx = -4.8;
+        this.state = this.facing < 0 ? "WALK_FWD" : "WALK_BACK";
         break;
       case "RIGHT":
-        this.vx = (this.facing > 0 ? 1 : -1) * 4.8;
+        this.vx = 4.8;
         this.state = this.facing > 0 ? "WALK_FWD" : "WALK_BACK";
         break;
     }
@@ -569,62 +584,100 @@ class FighterEntity {
 
   // --- CPU AI Engine ---
   updateAI(dt) {
+    if (!this.opponent || !this.engine.matchActive || this.hp <= 0) return;
+    if (this.state === "KNOCKDOWN" || this.state === "GETUP" || this.state === "HIT") return;
+
     this.aiTimer -= dt;
-    if (this.aiTimer > 0) return;
-
-    const diff = this.engine.difficulty;
     const opp = this.opponent;
+    const diff = this.engine.difficulty;
     const dist = Math.abs(this.x - opp.x);
-    const rand = Math.random();
+    // Direction directly TOWARDS opponent (-1 = left, +1 = right)
+    const toOpp = (opp.x < this.x) ? -1 : 1;
 
-    // AI Reaction speed
-    this.aiTimer = diff === "hard" ? 0.15 + Math.random() * 0.15 : (diff === "normal" ? 0.3 + Math.random() * 0.25 : 0.6 + Math.random() * 0.4);
-
-    // Hard AI: Use Super if Shakti is ready!
-    if (this.shakti >= 50 && rand < (diff === "hard" ? 0.6 : 0.3) && dist < 7) {
-      this.triggerAction("SUPER");
-      return;
-    }
-
-    // Defensive Reaction if opponent attacks
-    if (opp.isAttacking && dist < 2.5) {
-      if (rand < (diff === "hard" ? 0.75 : (diff === "normal" ? 0.45 : 0.15))) {
+    // 1. Reactive Defense: Block when player attacks in striking distance
+    if (opp.isAttacking && dist < 2.5 && !this.isAttacking) {
+      const blockChance = diff === "hard" ? 0.70 : (diff === "normal" ? 0.40 : 0.15);
+      if (Math.random() < blockChance && this.state !== "BLOCK") {
         this.triggerAction("BLOCK");
+        this.aiTimer = 0.25;
         return;
       }
     }
 
-    // In Close Combat Range (< 2 units)
-    if (dist < 2.0) {
-      if (opp.state === "BLOCK" && diff === "hard" && rand < 0.6) {
-        this.triggerAction("GRAB"); // Break player's block with grab!
-      } else if (rand < 0.35) {
-        this.triggerAction("PUNCH");
-      } else if (rand < 0.65) {
-        this.triggerAction("KICK");
-      } else if (rand < 0.8) {
-        this.triggerAction("SWEEP");
-      } else {
-        this.triggerAction("LEFT");
+    // 2. Tactical Decision Timer
+    if (this.aiTimer <= 0) {
+      this.aiTimer = diff === "hard" ? (0.12 + Math.random() * 0.12) : 
+                     (diff === "normal" ? (0.18 + Math.random() * 0.16) : (0.28 + Math.random() * 0.22));
+
+      const rand = Math.random();
+
+      // A. Super Attack: Unleash Super when Shakti is ready!
+      if (this.shakti >= 50 && dist < 7.5 && rand < (diff === "hard" ? 0.65 : 0.40)) {
+        this.triggerAction("SUPER");
+        this.aiTimer = 0.8;
+        return;
       }
-      return;
+
+      // B. Close Combat Range (dist <= 2.2): Attack with punch/kick/sweep combos!
+      if (dist <= 2.2) {
+        if (opp.state === "BLOCK" && rand < 0.65) {
+          // Break guard with grab!
+          this.triggerAction("GRAB");
+        } else if (rand < 0.35) {
+          // Punch combo
+          this.triggerAction("PUNCH");
+          setTimeout(() => {
+            if (this.engine.matchActive && Math.abs(this.x - opp.x) <= 2.2) {
+              this.triggerAction(Math.random() < 0.5 ? "PUNCH" : "KICK");
+            }
+          }, 140);
+        } else if (rand < 0.65) {
+          // Kick combo
+          this.triggerAction("KICK");
+          setTimeout(() => {
+            if (this.engine.matchActive && Math.abs(this.x - opp.x) <= 2.2) {
+              this.triggerAction("KICK");
+            }
+          }, 160);
+        } else if (rand < 0.85) {
+          // Low trip sweep
+          this.triggerAction("SWEEP");
+        } else {
+          // Unblockable Grab
+          this.triggerAction("GRAB");
+        }
+        return;
+      }
+
+      // C. Mid Range (2.2 < dist <= 5.0): Jump Attack or Slide Sweep
+      if (dist <= 5.0) {
+        if (rand < 0.35 && diff !== "easy" && this.onGround) {
+          // Flying Jump Kick forward into opponent
+          this.triggerAction("JUMP");
+          this.vx = toOpp * 5.5;
+          setTimeout(() => {
+            if (this.engine.matchActive) this.triggerAction("KICK");
+          }, 180);
+          return;
+        } else if (rand < 0.55 && this.onGround) {
+          // Slide / Sweep attack
+          this.vx = toOpp * 5.8;
+          this.triggerAction("SWEEP");
+          return;
+        }
+      }
     }
 
-    // Mid Range (2 to 6 units): Close the distance or jump kick
-    if (dist <= 6) {
-      if (rand < 0.5) {
-        this.triggerAction(opp.x < this.x ? "LEFT" : "RIGHT");
-      } else if (rand < 0.75 && diff !== "easy") {
-        this.triggerAction("JUMP");
-        setTimeout(() => this.triggerAction("KICK"), 150);
+    // 3. Continuous Advance: ALWAYS walk/charge forward towards opponent to fight!
+    if (!this.isAttacking && this.state !== "BLOCK" && this.onGround) {
+      if (dist > 1.9) {
+        const speed = diff === "hard" ? 5.2 : (diff === "normal" ? 4.5 : 3.8);
+        this.vx = toOpp * speed;
+        this.state = "WALK_FWD";
       } else {
-        this.triggerAction("PUNCH");
+        this.vx *= 0.5;
       }
-      return;
     }
-
-    // Far Range (> 6 units): Advance towards player
-    this.triggerAction(opp.x < this.x ? "LEFT" : "RIGHT");
   }
 }
 

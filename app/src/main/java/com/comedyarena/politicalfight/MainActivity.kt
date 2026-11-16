@@ -1,36 +1,33 @@
 package com.comedyarena.politicalfight
 
-import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context
-import android.content.Intent
+import android.opengl.GLSurfaceView
 import android.os.Build
 import android.os.Bundle
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
-import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import com.comedyarena.politicalfight.game3d.Audio
+import com.comedyarena.politicalfight.game3d.GlRenderer
+import com.comedyarena.politicalfight.game3d.UiView
+import com.comedyarena.politicalfight.game3d.core.Engine
 
+/**
+ * Pure native Kotlin 3D OpenGL ES 2.0 Activity for Neta Fight.
+ * Uses GLSurfaceView (3D scene) + hardware-accelerated Canvas UiView + synthesized AudioTrack sound.
+ * Zero WebView / HTML dependency.
+ */
 class MainActivity : Activity() {
+    private lateinit var gl: GLSurfaceView
+    private lateinit var ui: UiView
+    private lateinit var engine: Engine
+    private val audio = Audio()
 
-    private lateinit var webView: WebView
-
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Keep screen on during fights
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Notch / Display Cutout Full Screen support
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -40,184 +37,76 @@ class MainActivity : Activity() {
         AdManager.init(this)
         AdManager.loadInterstitial(this)
 
-        val hasExplicitMatch = intent.hasExtra("p1")
-        val p1 = intent.getIntExtra("p1", 0)
-        val p2 = intent.getIntExtra("p2", -1)
-        val arena = intent.getIntExtra("arena", 0)
-        val mode = intent.getStringExtra("mode") ?: "quick"
-        val p2Resolved = if (p2 >= 0) p2 else (p1 + 1) % 11
+        ui = UiView(this, audio)
+        engine = Engine(ui)
+        ui.attach(engine)
 
-        // Setup Hardware-Accelerated 3D WebGL WebView
-        webView = WebView(this).apply {
-            setBackgroundColor(android.graphics.Color.BLACK)
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                allowFileAccess = true
-                allowContentAccess = true
-                mediaPlaybackRequiresUserGesture = false
-                cacheMode = WebSettings.LOAD_DEFAULT
-                loadWithOverviewMode = true
-                useWideViewPort = true
-                displayZoomControls = false
-                builtInZoomControls = false
-                userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        // Hook AdMob Interstitial on match/level completion
+        ui.onMatchEnd = {
+            runOnUiThread {
+                AdManager.showInterstitial(this@MainActivity) {}
             }
-
-            webChromeClient = WebChromeClient()
-            webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    super.onPageFinished(view, url)
-                    applyImmersiveMode()
-                    if (hasExplicitMatch) {
-                        val jsMode = if (mode == "online") "online" else "cpu"
-                        view?.evaluateJavascript(
-                            "if (window.initAndroidMatch) { window.initAndroidMatch($p1, $p2Resolved, $arena, '$jsMode'); }",
-                            null
-                        )
-                    }
-                }
-
-                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                    super.onReceivedError(view, request, error)
-                    if (request?.isForMainFrame == true) {
-                        view?.loadUrl("file:///android_asset/game/index.html")
-                    }
-                }
-            }
-
-            addJavascriptInterface(WebAppInterface(this@MainActivity), "Android")
-            addJavascriptInterface(NativeBridge(this@MainActivity), "Native")
-
-            val targetUrl = if (hasExplicitMatch) {
-                "file:///android_asset/game/index.html?autostart=1&p1=$p1&p2=$p2Resolved&stage=$arena&mode=$mode"
-            } else {
-                "file:///android_asset/game/index.html"
-            }
-            loadUrl(targetUrl)
         }
 
-        setContentView(webView)
-        applyImmersiveMode()
+        gl = GLSurfaceView(this).apply {
+            setEGLContextClientVersion(2)
+            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+            setRenderer(GlRenderer(this@MainActivity, engine))
+            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        }
+
+        val root = FrameLayout(this)
+        root.addView(gl, FrameLayout.LayoutParams(-1, -1))
+        root.addView(ui, FrameLayout.LayoutParams(-1, -1))
+        setContentView(root)
+        hideBars()
     }
 
-    private fun applyImmersiveMode() {
+    private fun hideBars() {
         @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        )
+        window.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            or View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideBars()
     }
 
     override fun onResume() {
         super.onResume()
-        applyImmersiveMode()
-        webView.onResume()
-        webView.evaluateJavascript("window.onNativeResume && window.onNativeResume()", null)
+        gl.onResume()
+        audio.resume()
     }
 
     override fun onPause() {
-        webView.evaluateJavascript("window.onNativePause && window.onNativePause()", null)
-        webView.onPause()
+        ui.onHostPause()
+        audio.pause()
+        gl.onPause()
         super.onPause()
     }
 
     override fun onDestroy() {
-        webView.destroy()
+        audio.stop()
         super.onDestroy()
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        webView.evaluateJavascript("if (window.onNativeBack) { window.onNativeBack(); } else { window.history.back(); }", null)
-    }
-
-    // --- JavaScript to Native Android Bridge (kursi3d Native interface) ---
-    class NativeBridge(private val activity: MainActivity) {
-        @JavascriptInterface
-        fun vibrate(ms: Long) {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val vm = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-                    vm.defaultVibrator.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-                } else {
-                    @Suppress("DEPRECATION")
-                    val vib = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-                    } else {
-                        @Suppress("DEPRECATION")
-                        vib.vibrate(ms)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-
-        @JavascriptInterface
-        fun quit() {
-            activity.runOnUiThread {
-                activity.finish()
-            }
+        if (!ui.back()) {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
         }
     }
 
-    // --- JavaScript to Native Android Bridge ---
-    class WebAppInterface(private val activity: MainActivity) {
-
-        @JavascriptInterface
-        fun vibrate(type: String) {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val vm = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-                    val vib = vm.defaultVibrator
-                    val ms = if (type == "heavy") 120L else 35L
-                    vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-                } else {
-                    @Suppress("DEPRECATION")
-                    val vib = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                    val ms = if (type == "heavy") 120L else 35L
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vib.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
-                    } else {
-                        @Suppress("DEPRECATION")
-                        vib.vibrate(ms)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+    override fun dispatchKeyEvent(e: KeyEvent): Boolean {
+        if (e.keyCode != KeyEvent.KEYCODE_BACK && e.keyCode != KeyEvent.KEYCODE_VOLUME_UP && e.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (ui.key(e.keyCode, e.action == KeyEvent.ACTION_DOWN, e.repeatCount > 0)) return true
         }
-
-        @JavascriptInterface
-        fun showAd() {
-            activity.runOnUiThread {
-                AdManager.showInterstitial(activity) {}
-            }
-        }
-
-        @JavascriptInterface
-        fun shareRoomCode(code: String) {
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, "Battle me in Neta Fight!")
-                putExtra(Intent.EXTRA_TEXT, "Join my arena match in Neta Fight using Room Code: $code\nGet ready for the great power battle!")
-            }
-            activity.startActivity(Intent.createChooser(intent, "Share Room Code"))
-        }
-
-        @JavascriptInterface
-        fun exitApp() {
-            activity.runOnUiThread {
-                activity.finish()
-            }
-        }
+        return super.dispatchKeyEvent(e)
     }
 }

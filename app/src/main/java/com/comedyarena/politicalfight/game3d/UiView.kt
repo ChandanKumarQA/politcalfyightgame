@@ -1,6 +1,9 @@
 package com.comedyarena.politicalfight.game3d
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.*
 import android.os.Build
 import android.os.VibrationEffect
@@ -8,6 +11,8 @@ import android.os.Vibrator
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.widget.Toast
+import com.comedyarena.politicalfight.FirebaseMultiplayer
 import com.comedyarena.politicalfight.game3d.core.*
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.abs
@@ -21,8 +26,11 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
     lateinit var engine: Engine
     var onMatchEnd: (() -> Unit)? = null
 
-    private enum class Screen { TITLE, SELECT, LEVELS, FIGHT, PAUSE, RESULT }
-    private enum class A { VS, LV, BACK, FIGHT, CARD, STAGE, CPU, TAB, CELL, LV_START, LV_BACK, PAUSE, RESUME, MUSIC, QUIT, NEXT, REMATCH, CHAR }
+    private enum class Screen { TITLE, SELECT, LEVELS, FIGHT, PAUSE, RESULT, SETTINGS, FRIEND_MENU, FRIEND_HOST }
+    private enum class A {
+        VS, LV, BACK, FIGHT, CARD, STAGE, CPU, TAB, CELL, LV_START, LV_BACK, PAUSE, RESUME, MUSIC, QUIT, NEXT, REMATCH, CHAR,
+        PLAY, SETTINGS, SETTING_MUSIC, SETTING_SFX, SETTING_VIBE, FRIEND, HOST_ROOM, JOIN_ROOM, SHARE_WA, COPY_CODE, KEY_CHAR, KEY_DEL
+    }
     private class Hit(val l: Float, val t: Float, val r: Float, val b: Float, val a: A, val arg: Int)
     private class PopFx(val text: String, val x: Float, val y: Float, val color: Int, val t0: Long)
     private class PadBtn(val key: Int, var cx: Float, var cy: Float, val r: Float, val label: String, val color: Int)
@@ -34,6 +42,11 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
     private var info: LevelInfo? = null; private var selInfo: LevelInfo? = null
     private val stars = IntArray(LEVEL_COUNT + 1); private var lastLevel = 1
     private val prefs = ctx.getSharedPreferences("netafight3d", Context.MODE_PRIVATE)
+    private var musicEnabled = prefs.getBoolean("music", true)
+    private var sfxEnabled = prefs.getBoolean("sfx", true)
+    private var vibeEnabled = prefs.getBoolean("vibe", true)
+    private var hostedCode = "6BWK"
+    private var enteredCode = ""
     private val face: Typeface = try { Typeface.createFromAsset(ctx.assets, "fonts/Bangers.ttf") } catch (e: Exception) { Typeface.DEFAULT_BOLD }
     private val p = Paint(Paint.ANTI_ALIAS_FLAG).also { it.typeface = face }
     private val rect = RectF(); private val path = Path()
@@ -53,6 +66,7 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
 
     init {
         loadSave()
+        audio.musicOn = musicEnabled
         for (i in 0 until 5) { val a = -Math.PI / 2 + i * 2 * Math.PI / 5; val b = a + Math.PI / 5
             val x1 = cos(a).toFloat(); val y1 = sin(a).toFloat(); val x2 = cos(b).toFloat() * 0.42f; val y2 = sin(b).toFloat() * 0.42f
             if (i == 0) starPath.moveTo(x1, y1) else starPath.lineTo(x1, y1); starPath.lineTo(x2, y2) }
@@ -84,17 +98,24 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
     override fun pop(text: String, sx: Float, sy: Float, color: Int) { pops.add(PopFx(text, sx, sy, color, now)); while (pops.size > 12) pops.poll() }
     override fun flash(color: Int) { flashColor = color; flashAt = now }
     override fun vibe(ms: Int) {
+        if (!vibeEnabled) return
         try {
             val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(ms.toLong(), VibrationEffect.DEFAULT_AMPLITUDE)) else @Suppress("DEPRECATION") v.vibrate(ms.toLong())
         } catch (e: Exception) { }
     }
-    override fun sfx(s: Sfx) = audio.sfx(s)
+    override fun sfx(s: Sfx) {
+        if (sfxEnabled) audio.sfx(s)
+    }
+
+    private fun uiSound() {
+        if (sfxEnabled) audio.ui()
+    }
 
     // ------------------------------------------------------------ flow
     private fun goSelect(st: Boolean? = null) {
         if (st != null) story = st
-        audio.ui(); val a = sel1; val b = sel2; val sg = stageSel
+        uiSound(); val a = sel1; val b = sel2; val sg = stageSel
         engine.post { engine.preview(a, b, 2.7f); engine.previewWide = false; engine.applyStage(sg) }
         screen = Screen.SELECT
     }
@@ -105,13 +126,13 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
     }
     private fun startFight() {
         if (story) { goLevels(); return }
-        audio.ui(); engine.paused = false; hudInit(); screen = Screen.FIGHT
+        uiSound(); engine.paused = false; hudInit(); screen = Screen.FIGHT
         val a = sel1; val b = sel2; val l = cpuSel.toFloat(); val s = stageSel
         engine.post { engine.startMatch(a, b, l, s) }
     }
     private fun hudInit() { g1 = 1f; g2 = 1f; bannerText = ""; resultAt = 0L; pops.clear() }
     private fun goLevels() {
-        audio.ui(); engine.paused = false; story = true
+        uiSound(); engine.paused = false; story = true
         val a = sel1; val b = sel2
         engine.post { engine.preview(a, b, 4.2f); engine.previewWide = true }
         screen = Screen.LEVELS; selectLevel(lastLevel)
@@ -119,12 +140,12 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
     private fun selectLevel(n: Int) { selLv = n; page = (n - 1) / 50; selInfo = levelInfo(n) }
     private fun startLevel(n0: Int) {
         val n = n0.coerceIn(1, LEVEL_COUNT); story = true; lv = n; selLv = n; val inf = levelInfo(n); info = inf
-        lastLevel = n; writeSave(); audio.ui(); engine.paused = false; hudInit(); screen = Screen.FIGHT
+        lastLevel = n; writeSave(); uiSound(); engine.paused = false; hudInit(); screen = Screen.FIGHT
         val a = sel1; engine.post { engine.startLevel(inf, a) }
     }
     private fun pauseGame(on: Boolean) {
         if (screen != Screen.FIGHT && screen != Screen.PAUSE) return
-        engine.paused = on; screen = if (on) Screen.PAUSE else Screen.FIGHT; audio.ui()
+        engine.paused = on; screen = if (on) Screen.PAUSE else Screen.FIGHT; uiSound()
         if (on) { engine.clearInput(); java.util.Arrays.fill(padHeld, false) }
     }
     fun onHostPause() { if (screen == Screen.FIGHT) pauseGame(true) }
@@ -135,14 +156,17 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
             Screen.FIGHT -> { pauseGame(true); return true }
             Screen.PAUSE -> { pauseGame(false); return true }
             Screen.RESULT -> { if (story) goLevels() else goSelect(); return true }
-            Screen.LEVELS -> { goSelect(true); return true }
+            Screen.LEVELS -> { goTitle(); return true }
             Screen.SELECT -> { goTitle(); return true }
+            Screen.SETTINGS -> { goTitle(); return true }
+            Screen.FRIEND_MENU -> { goTitle(); return true }
+            Screen.FRIEND_HOST -> { FirebaseMultiplayer.stopPolling(); screen = Screen.FRIEND_MENU; uiSound(); return true }
             Screen.TITLE -> return false
         }
     }
 
     private fun pickCard(i: Int) {
-        audio.ui()
+        uiSound()
         val idx = if (i >= Roster.all.size) (Math.random() * Roster.all.size).toInt() else i
         if (phase == 0 || story) { sel1 = idx; engine.post { engine.swapPreview(1, idx) } } else { sel2 = idx; engine.post { engine.swapPreview(2, idx) } }
         phase = if (story) 0 else 1 - phase
@@ -150,23 +174,124 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
 
     private fun act(h: Hit) {
         when (h.a) {
+            A.PLAY -> goLevels()
             A.VS -> goSelect(false)
-            A.LV -> goSelect(true)
-            A.BACK -> goTitle()
+            A.LV -> goLevels()
+            A.BACK -> {
+                when (screen) {
+                    Screen.FRIEND_HOST -> { FirebaseMultiplayer.stopPolling(); screen = Screen.FRIEND_MENU; uiSound() }
+                    Screen.FRIEND_MENU, Screen.SETTINGS, Screen.SELECT, Screen.LEVELS -> goTitle()
+                    else -> goTitle()
+                }
+            }
+            A.SETTINGS -> { screen = Screen.SETTINGS; uiSound() }
+            A.SETTING_MUSIC -> {
+                musicEnabled = !musicEnabled
+                audio.musicOn = musicEnabled
+                prefs.edit().putBoolean("music", musicEnabled).apply()
+                uiSound()
+            }
+            A.SETTING_SFX -> {
+                sfxEnabled = !sfxEnabled
+                prefs.edit().putBoolean("sfx", sfxEnabled).apply()
+                uiSound()
+            }
+            A.SETTING_VIBE -> {
+                vibeEnabled = !vibeEnabled
+                prefs.edit().putBoolean("vibe", vibeEnabled).apply()
+                uiSound()
+            }
+            A.FRIEND -> {
+                enteredCode = ""
+                screen = Screen.FRIEND_MENU
+                uiSound()
+            }
+            A.HOST_ROOM -> {
+                hostedCode = FirebaseMultiplayer.generateRoomCode()
+                screen = Screen.FRIEND_HOST
+                uiSound()
+                FirebaseMultiplayer.hostRoom(sel1, stageSel) { code, _ ->
+                    if (code != null) hostedCode = code
+                    FirebaseMultiplayer.waitForGuest(hostedCode) { clientHero ->
+                        post {
+                            sel2 = clientHero.coerceIn(0, Roster.all.size - 1)
+                            startFight()
+                        }
+                    }
+                }
+            }
+            A.JOIN_ROOM -> {
+                val code = enteredCode.trim().uppercase()
+                if (code.length < 4) {
+                    Toast.makeText(ctx, "Please enter 4-letter room code!", Toast.LENGTH_SHORT).show()
+                } else {
+                    uiSound()
+                    Toast.makeText(ctx, "Joining room $code...", Toast.LENGTH_SHORT).show()
+                    FirebaseMultiplayer.joinRoom(code, sel1) { success, hostHero, stage, _ ->
+                        post {
+                            sel2 = hostHero.coerceIn(0, Roster.all.size - 1)
+                            stageSel = stage.coerceIn(0, 2)
+                            startFight()
+                        }
+                    }
+                }
+            }
+            A.SHARE_WA -> {
+                val text = "Join my 3D Neta Fight match! Enter room code: $hostedCode in Neta Fight: The Great Power Battle 3D"
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    putExtra(Intent.EXTRA_TEXT, text)
+                    type = "text/plain"
+                    setPackage("com.whatsapp")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try {
+                    ctx.startActivity(sendIntent)
+                } catch (e: Exception) {
+                    val chooser = Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                        putExtra(Intent.EXTRA_TEXT, text)
+                        type = "text/plain"
+                    }, "Share Room Code").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                    ctx.startActivity(chooser)
+                }
+            }
+            A.COPY_CODE -> {
+                val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Neta Fight Code", hostedCode))
+                Toast.makeText(ctx, "Room code $hostedCode copied!", Toast.LENGTH_SHORT).show()
+                pop("COPIED: $hostedCode", 0.5f, 0.45f, 0xFF4ADE80.toInt())
+                uiSound()
+            }
+            A.KEY_CHAR -> {
+                if (enteredCode.length < 4) {
+                    enteredCode += h.arg.toChar()
+                    uiSound()
+                }
+            }
+            A.KEY_DEL -> {
+                if (enteredCode.isNotEmpty()) {
+                    enteredCode = enteredCode.dropLast(1)
+                    uiSound()
+                }
+            }
             A.FIGHT -> startFight()
             A.CARD -> pickCard(h.arg)
-            A.STAGE -> { stageSel = h.arg; audio.ui(); engine.post { engine.applyStage(h.arg) } }
-            A.CPU -> { cpuSel = h.arg; audio.ui() }
-            A.TAB -> { page = h.arg; audio.ui() }
-            A.CELL -> { if (h.arg == selLv) startLevel(h.arg) else { selectLevel(h.arg); audio.ui() } }
+            A.STAGE -> { stageSel = h.arg; uiSound(); engine.post { engine.applyStage(h.arg) } }
+            A.CPU -> { cpuSel = h.arg; uiSound() }
+            A.TAB -> { page = h.arg; uiSound() }
+            A.CELL -> { if (h.arg == selLv) startLevel(h.arg) else { selectLevel(h.arg); uiSound() } }
             A.LV_START -> startLevel(selLv)
-            A.LV_BACK -> goSelect(true)
+            A.LV_BACK -> goTitle()
             A.PAUSE -> pauseGame(true)
             A.RESUME -> pauseGame(false)
-            A.MUSIC -> { audio.musicOn = !audio.musicOn; audio.ui() }
+            A.MUSIC -> {
+                musicEnabled = !musicEnabled
+                audio.musicOn = musicEnabled
+                prefs.edit().putBoolean("music", musicEnabled).apply()
+                uiSound()
+            }
             A.QUIT -> { engine.paused = false; if (story) goLevels() else goSelect() }
             A.NEXT -> startLevel(lv + 1)
-            A.REMATCH -> { hudInit(); screen = Screen.FIGHT; engine.post { engine.rematch() }; audio.ui() }
+            A.REMATCH -> { hudInit(); screen = Screen.FIGHT; engine.post { engine.rematch() }; uiSound() }
             A.CHAR -> { if (story) goLevels() else goSelect() }
         }
     }
@@ -333,6 +458,9 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
             Screen.FIGHT -> { drawHud(cv); drawPad(cv) }
             Screen.PAUSE -> { drawHud(cv); drawPause(cv) }
             Screen.RESULT -> { drawHud(cv); drawResult(cv) }
+            Screen.SETTINGS -> drawSettings(cv)
+            Screen.FRIEND_MENU -> drawFriendMenu(cv)
+            Screen.FRIEND_HOST -> drawFriendHost(cv)
         }
         cv.restore()
         postInvalidateOnAnimation()
@@ -349,15 +477,125 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
     }
 
     private fun drawTitle(cv: Canvas) {
-        cv.save(); cv.rotate(-3f, DW / 2, 90f)
-        text(cv, "NETA", DW / 2, 90f, 78f, 0xFFFBBF24.toInt(), stroke = 0xFFB3261E.toInt(), sw = 14f)
-        text(cv, "FIGHT", DW / 2, 150f, 78f, 0xFFFFFFFF.toInt(), stroke = 0xFFB3261E.toInt(), sw = 14f)
+        // Top right quick buttons: Sound Toggle & Settings
+        btn(cv, A.SETTING_MUSIC, 0, DW - 48f, 10f, DW - 10f, 44f, if (musicEnabled) "🔊" else "🔇", 0xCC1A0D06.toInt(), 16f)
+        btn(cv, A.SETTINGS, 0, DW - 90f, 10f, DW - 52f, 44f, "⚙", 0xCC1A0D06.toInt(), 18f)
+
+        cv.save(); cv.rotate(-3f, DW / 2, 70f)
+        text(cv, "NETA", DW / 2, 70f, 74f, 0xFFFBBF24.toInt(), stroke = 0xFFB3261E.toInt(), sw = 14f)
+        text(cv, "FIGHT", DW / 2, 130f, 74f, 0xFFFFFFFF.toInt(), stroke = 0xFFB3261E.toInt(), sw = 14f)
         cv.restore()
-        text(cv, "★ THE GREAT POWER BATTLE ★ 3D", DW / 2, 178f, 15f, 0xFFFFE066.toInt())
-        btn(cv, A.VS, 0, DW / 2 - 158f, 214f, DW / 2 - 8f, 262f, "VS CPU", 0xFFD62839.toInt(), 24f)
-        btn(cv, A.LV, 0, DW / 2 + 8f, 214f, DW / 2 + 158f, 262f, "500 LEVELS", 0xFF2563EB.toInt(), 24f)
-        val l = wrap("Political satire & parody game. All characters are original and fictional. Cartoon violence — don't imitate in real life.", 10f, DW - 60f)
-        for ((i, s) in l.withIndex()) text(cv, s, DW / 2, DH - 28f + i * 12f, 10f, 0xFFFFFFFF.toInt(), sw = 2f)
+        text(cv, "★ THE GREAT POWER BATTLE ★ 3D", DW / 2, 156f, 14f, 0xFFFFE066.toInt())
+
+        // 1. PLAY BUTTON (Opens 500 Levels select directly!)
+        btn(cv, A.PLAY, 0, DW / 2 - 140f, 175f, DW / 2 + 140f, 222f, "▶  PLAY  (500 LEVELS)", 0xFF43A047.toInt(), 20f)
+
+        // 2. Secondary Row: VS CPU and PLAY WITH A FRIEND
+        btn(cv, A.VS, 0, DW / 2 - 165f, 232f, DW / 2 - 8f, 272f, "🥊  VS CPU", 0xFFD62839.toInt(), 15f)
+        btn(cv, A.FRIEND, 0, DW / 2 + 8f, 232f, DW / 2 + 165f, 272f, "🌐  WITH A FRIEND", 0xFF1976D2.toInt(), 15f)
+
+        // 3. Settings Button on 1st Screen
+        btn(cv, A.SETTINGS, 0, DW / 2 - 70f, 282f, DW / 2 + 70f, 314f, "⚙  SETTINGS", 0xCC3A2A1A.toInt(), 13f)
+
+        val l = wrap("Political satire & parody game. All characters are original and fictional. Cartoon violence — don't imitate in real life.", 9f, DW - 60f)
+        for ((i, s) in l.withIndex()) text(cv, s, DW / 2, DH - 18f + i * 10f, 9f, 0xCCFFFFFF.toInt(), sw = 1.5f)
+    }
+
+    private fun drawSettings(cv: Canvas) {
+        btn(cv, A.BACK, 0, 10f, 10f, 74f, 36f, "‹ BACK", 0xCC3A2A1A.toInt(), 13f)
+        text(cv, "SETTINGS", DW / 2, 45f, 28f, 0xFFFBBF24.toInt(), stroke = 0xFFB3261E.toInt(), sw = 5f)
+
+        val cw = min(400f, DW - 30f)
+        val cl = (DW - cw) / 2
+        val cr = cl + cw
+        panel(cv, cl, 62f, cr, 285f, 0xEE1E140F.toInt(), 0xFFFBBF24.toInt())
+
+        // Row 1: Music
+        text(cv, "MUSIC & SOUNDTRACK", cl + 24f, 100f, 14f, Color.WHITE, Paint.Align.LEFT, sw = 2f)
+        btn(cv, A.SETTING_MUSIC, 0, cr - 85f, 82f, cr - 24f, 114f, if (musicEnabled) "ON" else "OFF", if (musicEnabled) 0xFF43A047.toInt() else 0xFF757575.toInt(), 14f)
+
+        // Row 2: SFX
+        text(cv, "SOUND EFFECTS (SFX)", cl + 24f, 144f, 14f, Color.WHITE, Paint.Align.LEFT, sw = 2f)
+        btn(cv, A.SETTING_SFX, 0, cr - 85f, 126f, cr - 24f, 158f, if (sfxEnabled) "ON" else "OFF", if (sfxEnabled) 0xFF43A047.toInt() else 0xFF757575.toInt(), 14f)
+
+        // Row 3: Vibration
+        text(cv, "HAPTIC VIBRATION", cl + 24f, 188f, 14f, Color.WHITE, Paint.Align.LEFT, sw = 2f)
+        btn(cv, A.SETTING_VIBE, 0, cr - 85f, 170f, cr - 24f, 202f, if (vibeEnabled) "ON" else "OFF", if (vibeEnabled) 0xFF43A047.toInt() else 0xFF757575.toInt(), 14f)
+
+        // Row 4: Game Engine Info
+        text(cv, "ENGINE: NATIVE 3D OPENGL ES 2.0 (60 FPS)", DW / 2, 238f, 12f, 0xFFFFD700.toInt(), sw = 2f)
+        text(cv, "VERSION 1.0.3 · NETA FIGHT PARODY", DW / 2, 258f, 10f, 0xFFB0BEC5.toInt(), sw = 1.5f)
+
+        btn(cv, A.BACK, 0, DW / 2 - 60f, 300f, DW / 2 + 60f, 336f, "‹ CLOSE", 0xFF2E1C14.toInt(), 14f)
+    }
+
+    private fun drawFriendMenu(cv: Canvas) {
+        btn(cv, A.BACK, 0, 10f, 10f, 74f, 36f, "‹ BACK", 0xCC3A2A1A.toInt(), 13f)
+        text(cv, "PLAY WITH A FRIEND", DW / 2, 40f, 28f, 0xFFFFB300.toInt(), stroke = 0xFF5D1010.toInt(), sw = 6f)
+
+        val cw = min(420f, DW - 30f)
+        val cl = (DW - cw) / 2
+        val cr = cl + cw
+        panel(cv, cl, 56f, cr, 292f, 0xEE1E140F.toInt(), 0xFF5D4037.toInt())
+
+        // 1. HOST A ROOM button (Orange gradient matching Image 1)
+        btn(cv, A.HOST_ROOM, 0, cl + 24f, 70f, cr - 24f, 116f, "HOST A ROOM", 0xFFE65100.toInt(), 22f)
+
+        // 2. Subtitle: or enter your friend's room code
+        text(cv, "or enter your friend's room code", DW / 2, 138f, 13f, 0xFFD7CCC8.toInt(), sw = 2f)
+
+        // 3. CODE Input Display + JOIN Button (Matching Image 1)
+        val displayCode = if (enteredCode.isEmpty()) "CODE" else enteredCode
+        val codeCol = if (enteredCode.isEmpty()) 0x88FFFFFF.toInt() else Color.WHITE
+        rect.set(cl + 30f, 152f, cl + 220f, 196f)
+        p.style = Paint.Style.FILL; p.color = 0xFF140C08.toInt(); cv.drawRoundRect(rect, 8f, 8f, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 2f; p.color = 0xFFBCAAA4.toInt(); cv.drawRoundRect(rect, 8f, 8f, p)
+        text(cv, displayCode, cl + 125f, 182f, 22f, codeCol, sw = 2.5f)
+
+        btn(cv, A.JOIN_ROOM, 0, cl + 234f, 152f, cr - 30f, 196f, "JOIN", 0xFFFF9800.toInt(), 20f)
+
+        // 4. Quick on-screen touch keyboard for 4-letter room code
+        val keyChars = arrayOf("A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "P", "R", "S", "T", "W", "X", "Y", "Z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+        val kw = (cw - 44f) / 11f
+        for (i in 0 until 11) {
+            val kx = cl + 22f + i * kw
+            btn(cv, A.KEY_CHAR, keyChars[i][0].code, kx, 204f, kx + kw - 2f, 228f, keyChars[i], 0xCC2A1A10.toInt(), 11f)
+        }
+        for (i in 0 until 10) {
+            val kx = cl + 22f + i * kw
+            btn(cv, A.KEY_CHAR, keyChars[11 + i][0].code, kx, 232f, kx + kw - 2f, 256f, keyChars[11 + i], 0xCC2A1A10.toInt(), 11f)
+        }
+        for (i in 0 until 8) {
+            val kx = cl + 22f + i * kw
+            btn(cv, A.KEY_CHAR, keyChars[21 + i][0].code, kx, 260f, kx + kw - 2f, 284f, keyChars[21 + i], 0xCC2A1A10.toInt(), 11f)
+        }
+        val delX = cl + 22f + 8 * kw
+        btn(cv, A.KEY_DEL, 0, delX, 260f, cr - 22f, 284f, "⌫ DEL", 0xFF8C1D2A.toInt(), 12f)
+
+        btn(cv, A.BACK, 0, DW / 2 - 60f, 304f, DW / 2 + 60f, 338f, "BACK", 0xFF2E1C14.toInt(), 14f)
+    }
+
+    private fun drawFriendHost(cv: Canvas) {
+        btn(cv, A.BACK, 0, 10f, 10f, 74f, 36f, "‹ BACK", 0xCC3A2A1A.toInt(), 13f)
+        text(cv, "PLAY WITH A FRIEND", DW / 2, 40f, 28f, 0xFFFFB300.toInt(), stroke = 0xFF5D1010.toInt(), sw = 6f)
+
+        val cw = min(400f, DW - 30f)
+        val cl = (DW - cw) / 2
+        val cr = cl + cw
+        panel(cv, cl, 60f, cr, 282f, 0xEE1E140F.toInt(), 0xFF5D4037.toInt())
+
+        text(cv, "ROOM CODE", DW / 2, 92f, 14f, 0xFFB0BEC5.toInt(), sw = 2f)
+
+        val spacedCode = hostedCode.toCharArray().joinToString(" ")
+        text(cv, spacedCode, DW / 2, 145f, 48f, Color.WHITE, stroke = 0xFF111111.toInt(), sw = 8f)
+
+        btn(cv, A.SHARE_WA, 0, cl + 24f, 172f, DW / 2 - 8f, 216f, "Share on WhatsApp", 0xFF25D366.toInt(), 14f)
+        btn(cv, A.COPY_CODE, 0, DW / 2 + 8f, 172f, cr - 24f, 216f, "Copy link", 0xFF2E1C14.toInt(), 14f)
+
+        val dot = if ((now / 500_000_000L) % 2 == 0L) "●" else "○"
+        text(cv, "$dot Waiting for your friend to join...", DW / 2, 252f, 13f, 0xFFFFB300.toInt(), sw = 2f)
+
+        btn(cv, A.BACK, 0, DW / 2 - 60f, 298f, DW / 2 + 60f, 336f, "BACK", 0xFF2E1C14.toInt(), 14f)
     }
 
     private fun infoPanel(cv: Canvas, d: CharDef, who: String, l: Float, w: Float) {
@@ -399,6 +637,7 @@ class UiView(private val ctx: Context, private val audio: Audio) : View(ctx), Ev
             for (i in 0 until 3) btn(cv, A.STAGE, i, 12f + i * 66f, by + 12f, 74f + i * 66f, by + 34f, STAGE_NAMES[i].split(" ")[0], if (i == stageSel) 0xFFD62839.toInt() else 0xFF3A2A1A.toInt(), 10f, i == stageSel)
             text(cv, "CPU LEVEL", 224f, by + 8f, 9f, 0xFFD6C7A8.toInt(), Paint.Align.LEFT, sw = 1.5f)
             for (i in 0 until 3) btn(cv, A.CPU, i, 224f + i * 58f, by + 12f, 276f + i * 58f, by + 34f, LEVEL_NAMES[i], if (i == cpuSel) 0xFFD62839.toInt() else 0xFF3A2A1A.toInt(), 10f, i == cpuSel)
+            btn(cv, A.FRIEND, 0, DW - 325f, by, DW - 176f, by + 40f, "🌐 WITH FRIEND", 0xFF1976D2.toInt(), 14f)
         }
         btn(cv, A.FIGHT, 0, DW - 170f, by, DW - 10f, by + 40f, if (story) "LEVELS ›" else "FIGHT!", 0xFFD62839.toInt(), 22f)
     }
